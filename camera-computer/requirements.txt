@@ -1,0 +1,12 @@
+# SMART RECYCLE — 카메라 컴퓨터 Python 의존성
+# 권장 Python: 3.10 또는 3.11  (3.9 ~ 3.12 동작, 3.13+ 는 torch 휠 지원을 먼저 확인)
+#
+# torch / torchvision 은 ultralytics 설치 시 함께 설치된다.
+#   - 기본: CPU 버전 (GPU 없이도 동작)
+#   - NVIDIA GPU 가 '확인된' 경우에만 https://pytorch.org/get-started/locally/ 의 명령으로
+#     CUDA 버전 torch/torchvision 을 먼저 설치한 뒤 이 파일을 설치한다. (CUDA 버전을 임의로 고정하지 않음)
+ultralytics>=8.3,<9
+opencv-python>=4.8
+pyserial>=3.5
+requests>=2.31
+python-dotenv>=1.0
