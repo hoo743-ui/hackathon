@@ -12,7 +12,7 @@
 1. 맥북: `git checkout feature/smart-recycle-integration`, `.env` 확인 (`HARDWARE_MODE=EDGE_SERIAL`, `POSTGRES_DB`, `AI_API_TOKEN`)
 2. 맥북: 예전 `~/smart-recycling-system` 백엔드가 8000 포트를 쓰고 있으면 그 터미널에서 Ctrl+C (start_server.sh가 점유 여부를 알려 줌)
 3. 카메라 노트북: `edge/README.md` 대로 설치 → `best_model.pt` 복사 → `check_system.py` 전 항목 확인 → `build_exe.bat`
-4. Arduino IDE 로 UNO 에 **`firmware/uno_controller/uno_controller.ino`** 업로드 (ACK·거리 지원. 원본 trush.ino 도 동작은 하지만 성공 확인·적재율 불가), ESP32 에 `firmware/esp32_bridge/esp32_bridge.ino` 업로드 (Wi-Fi 전송을 쓰려면 `secrets.example.h` → `secrets.h`). 업로드 후 **시리얼 모니터 닫기**. 서보 3개는 MB102 5V, GND 공통, D3→GPIO16 분압 확인 (`HARDWARE_WIRING.md` 체크리스트)
+4. Arduino IDE 로 ([FIRMWARE_UPLOAD.md](FIRMWARE_UPLOAD.md)) UNO 에 **`firmware/uno_controller/uno_controller.ino`** 업로드 (ACK·거리 지원. 원본 trush.ino 도 동작은 하지만 성공 확인·적재율 불가), ESP32 에 `firmware/esp32_bridge/esp32_bridge.ino` 업로드 (Wi-Fi 전송을 쓰려면 `secrets.example.h` → `secrets.h`). 업로드 후 **시리얼 모니터 닫기**. 서보 3개는 MB102 5V, GND 공통, D3→GPIO16 분압 확인 (`HARDWARE_WIRING.md` 체크리스트)
 4-1. 빈 통에서 초음파 거리 실측 → 카메라 프로그램 설정의 "빈 통 거리", 센서가 달린 칸 → "초음파 센서 칸"
 5. 리허설: `docs/DEMO_END_TO_END_TEST.md` 표를 실제 장비로 채우기
 
