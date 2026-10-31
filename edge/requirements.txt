@@ -1,0 +1,8 @@
+# 카메라 노트북(A) — Python 3.10 / 3.11 권장 (3.9~3.12 동작)
+# torch/torchvision 은 ultralytics 가 CPU 버전으로 함께 설치한다.
+# NVIDIA GPU가 확인된 경우에만 https://pytorch.org 에서 CUDA 버전을 별도로 설치한다.
+ultralytics>=8.3,<9
+opencv-python>=4.8
+pyserial>=3.5
+requests>=2.31
+python-dotenv>=1.0

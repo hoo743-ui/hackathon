@@ -1,0 +1,13 @@
+{
+  "cli": { "version": ">= 16.0.0", "appVersionSource": "local" },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://CHANGE-ME-SERVER-IP:8000",
+        "EXPO_PUBLIC_WS_URL": "ws://CHANGE-ME-SERVER-IP:8000/ws/dashboard"
+      }
+    }
+  }
+}

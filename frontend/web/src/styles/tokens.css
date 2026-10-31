@@ -1,0 +1,184 @@
+/*
+ * Material Ledger 디자인 토큰 (docs/design/REDESIGN_PLAN.md §2). 색·타이포·간격은 이 파일에서만 정의한다.
+ * 테마: 기본 = 시스템 설정. html[data-theme="light" | "dark"] 로 사용자 선택을 고정한다.
+ */
+:root {
+  color-scheme: light;
+
+  /* 바탕과 잉크 */
+  --bg: #f3f1ec;
+  --surface: #fbfaf7;
+  --surface-sunken: #e9e6df;
+  --ink: #16181b;
+  --ink-2: #4a4f55;
+  --ink-3: #6b7076;
+  --rule: #d6d2c8;
+  --rule-strong: #16181b;
+  --on-ink: #fbfaf7;
+
+  /* 의미색 (상태 전용) */
+  --accent: #3d5a66;
+  --ok: #1f6b4a;
+  --attention: #8a5a00;
+  --warning: #c2410c;
+  --critical: #b3261e;
+  --unknown: #8d9196;
+  --signal: #d9480f;
+  --on-signal: #ffffff;
+
+  /* 상태색의 옅은 바탕 (경고 줄·필터 강조) */
+  --critical-wash: color-mix(in srgb, var(--critical) 9%, var(--surface));
+  --warning-wash: color-mix(in srgb, var(--warning) 9%, var(--surface));
+  --accent-wash: color-mix(in srgb, var(--accent) 10%, var(--surface));
+
+  /* 재질색 (정체성 전용 — 상태 표시에 쓰지 않음) */
+  --mat-plastic: #2e6f95;
+  --mat-metal: #6d4fa0;
+  --mat-paper: #8c6a2f;
+  --mat-glass: #3f4449;
+
+  /* 미확인·미보정 해치 */
+  --hatch: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--unknown) 55%, transparent) 0 2px,
+    transparent 2px 7px
+  );
+
+  /* 타이포 */
+  --font-sans: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --fs-display: 40px;
+  --lh-display: 44px;
+  --fs-readout-xl: 64px;
+  --fs-readout: 28px;
+  --lh-readout: 32px;
+  --fs-title: 22px;
+  --lh-title: 28px;
+  --fs-body: 15px;
+  --lh-body: 22px;
+  --fs-label: 13px;
+  --lh-label: 18px;
+  --fs-caption: 12px;
+  --lh-caption: 16px;
+
+  /* 간격 (4 기반) */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+
+  /* 형태 */
+  --r-chip: 2px;
+  --r-panel: 4px;
+  --r-estop: 6px;
+
+  /* 레이아웃 */
+  --header-h: 56px;
+  --sidebar-w: 240px;
+  --rail-w: 64px;
+  --page-pad: 40px;
+  --gutter: 24px;
+  --content-max: 1560px;
+
+  /* 깊이: 오버레이 전용 */
+  --shadow-overlay: 0 12px 32px rgb(22 24 27 / 0.18), 0 2px 6px rgb(22 24 27 / 0.12);
+  --scrim: rgb(22 24 27 / 0.42);
+
+  /* 모션 */
+  --t-fill: 240ms ease-out;
+  --t-state: 150ms ease-out;
+  --t-drawer: 200ms ease-out;
+}
+
+/* 다크 — 시스템 설정 (사용자가 라이트를 고정하지 않은 경우) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #111315;
+    --surface: #181b1e;
+    --surface-sunken: #0c0e10;
+    --ink: #eceae4;
+    --ink-2: #a9adb2;
+    --ink-3: #8a8f95;
+    --rule: #2a2e33;
+    --rule-strong: #eceae4;
+    --on-ink: #111315;
+    --accent: #8fb3c2;
+    --ok: #4fb286;
+    --attention: #e0a33a;
+    --warning: #ff7a3d;
+    --critical: #f2665c;
+    --unknown: #6b7076;
+    --signal: #ff7a3d;
+    --on-signal: #111315;
+    --mat-plastic: #6fa8d1;
+    --mat-metal: #a98bd3;
+    --mat-paper: #c9a465;
+    --mat-glass: #9aa1a8;
+    --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.4);
+    --scrim: rgb(0 0 0 / 0.6);
+  }
+}
+
+/* 다크 — 사용자가 고정 */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #111315;
+  --surface: #181b1e;
+  --surface-sunken: #0c0e10;
+  --ink: #eceae4;
+  --ink-2: #a9adb2;
+  --ink-3: #8a8f95;
+  --rule: #2a2e33;
+  --rule-strong: #eceae4;
+  --on-ink: #111315;
+  --accent: #8fb3c2;
+  --ok: #4fb286;
+  --attention: #e0a33a;
+  --warning: #ff7a3d;
+  --critical: #f2665c;
+  --unknown: #6b7076;
+  --signal: #ff7a3d;
+  --on-signal: #111315;
+  --mat-plastic: #6fa8d1;
+  --mat-metal: #a98bd3;
+  --mat-paper: #c9a465;
+  --mat-glass: #9aa1a8;
+  --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.4);
+  --scrim: rgb(0 0 0 / 0.6);
+}
+
+/* 브레이크포인트별 여백 (§3.1) */
+@media (max-width: 1439px) {
+  :root {
+    --page-pad: 32px;
+  }
+}
+@media (max-width: 1279px) {
+  :root {
+    --page-pad: 24px;
+    --gutter: 16px;
+  }
+}
+@media (max-width: 767px) {
+  :root {
+    --page-pad: 16px;
+    --gutter: 12px;
+    --fs-display: 32px;
+    --lh-display: 36px;
+    --fs-readout-xl: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fill: 0ms linear;
+    --t-state: 0ms linear;
+    --t-drawer: 0ms linear;
+  }
+}

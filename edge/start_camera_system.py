@@ -1,0 +1,364 @@
+"""SMART RECYCLE — 카메라 노트북(A) 실행 프로그램.
+
+카메라 → YOLO(best_model.pt) → 안정 검출 1회 → ① USB 시리얼로 하드웨어 명령 (즉시, 네트워크와 무관)
+                                              → ② 이미지+메타데이터를 맥북 백엔드로 전송 (백그라운드 큐)
+아두이노 시리얼 출력([ALERT] 만차) → 센서 이벤트로 백엔드 전송. 5초마다 상태(heartbeat) 보고.
+
+실행:  python start_camera_system.py            (설정: edge/.env)
+       python start_camera_system.py --source test.jpg --no-hw   (카메라 없이 이미지 파일로 파이프라인 확인)
+키:    q 종료 · r 화면 카운트 초기화
+"""
+from __future__ import annotations
+
+import argparse
+import logging
+import signal
+import sys
+import threading
+import time
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+import cv2
+import requests
+
+from smartrecycle_edge.config import EDGE_DIR, settings
+from smartrecycle_edge.detector import StableTrigger, YoloRunner, top_detection
+from smartrecycle_edge.hardware import LEGACY_ID_TO_SIGNAL, NAME_TO_SIGNAL, HardwareController, SerialLink
+from smartrecycle_edge.uploader import Uploader
+
+VERSION = "1.0.0"
+log = logging.getLogger("edge")
+
+
+def build_signal_map(names: dict[int, str]) -> dict[int, str]:
+    """모델 names 기준 매핑을 만들고 기존 ID 매핑(yolo_arduino.py)과 대조한다."""
+    by_name = {i: NAME_TO_SIGNAL[n.strip().lower()] for i, n in names.items() if n.strip().lower() in NAME_TO_SIGNAL}
+    for cid, sig in LEGACY_ID_TO_SIGNAL.items():
+        if cid in by_name and by_name[cid] != sig:
+            log.error("⚠️ 클래스 매핑 불일치: id %d 모델 이름 '%s' → '%s' 이지만 기존 코드는 '%s'. 모델 이름 기준을 사용합니다.",
+                      cid, names[cid], by_name[cid], sig)
+    if by_name and all(by_name.get(c) == s for c, s in LEGACY_ID_TO_SIGNAL.items()):
+        log.info("클래스 매핑 확인: 모델 names %s == 기존 CLASS_SIGNAL_MAP (G/M/P/L)", names)
+    if not by_name:
+        log.warning("모델에 Glass/Metal/Paper/Plastic 클래스가 없습니다 → 하드웨어 명령 없음, 서버에는 UNRECOGNIZED로 기록")
+    return by_name
+
+
+def open_camera(source: str):
+    if source.isdigit():
+        idx = int(source)
+        backend = cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_ANY
+        cap = cv2.VideoCapture(idx, backend)
+        if settings.camera_width:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, settings.camera_width)
+        if settings.camera_height:
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.camera_height)
+        return cap, False
+    path = Path(source)
+    if path.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp"}:
+        return path, True  # 정지 이미지: 같은 프레임 반복
+    return cv2.VideoCapture(str(path)), False
+
+
+class Heartbeat(threading.Thread):
+    def __init__(self, app: "EdgeApp"):
+        super().__init__(name="heartbeat", daemon=True)
+        self.app = app
+        self.stop_event = threading.Event()
+        self.http = requests.Session()
+        self.http.headers["Authorization"] = f"Bearer {settings.ai_api_token}"
+        self.was_online = False
+
+    def run(self) -> None:
+        while not self.stop_event.wait(settings.heartbeat_sec if self.was_online else 2.0):
+            a = self.app
+            body = {
+                "device_id": settings.device_id,
+                "camera_ok": a.camera_ok,
+                "camera_index": a.source,
+                "model_loaded": a.yolo is not None,
+                "model_name": Path(settings.model_path).name,
+                "model_classes": {str(k): v for k, v in (a.yolo.names.items() if a.yolo else [])},
+                "fps": round(a.fps, 1),
+                "serial_enabled": a.hw.enabled,
+                "serial_connected": a.hw.connected,
+                "serial_port": a.hw.port,
+                "esp32_port": settings.esp32_serial_port or None,
+                "esp32_connected": bool(a.esp32 and a.esp32.connected),
+                "upload_queue": a.uploader.pending,
+                "uploads_ok": a.uploader.stats.ok,
+                "uploads_failed": a.uploader.stats.failed,
+                "last_error": (a.hw.last_error or a.uploader.stats.last_error or None),
+                "version": VERSION,
+            }
+            if body["last_error"]:
+                body["last_error"] = body["last_error"][:300]
+            try:
+                r = self.http.post(f"{settings.backend_url}/api/edge/heartbeat", json=body, timeout=settings.http_timeout)
+                online = r.ok
+                if not r.ok:
+                    log.warning("heartbeat 거부: HTTP %s %s", r.status_code, r.text[:120])
+            except requests.RequestException as exc:
+                online = False
+                if self.was_online:
+                    log.warning("백엔드 연결 끊김: %s", exc)
+            if online and not self.was_online:
+                log.info("백엔드 연결됨: %s", settings.backend_url)
+                a.uploader.flush_outbox()  # 네트워크 복구 → 못 보낸 분류 재전송
+            self.was_online = online
+            a.backend_online = online
+
+
+class EdgeApp:
+    def __init__(self, args):
+        self.args = args
+        self.source = args.source or settings.camera_index
+        self.camera_ok = False
+        self.backend_online = False
+        self.fps = 0.0
+        self.yolo: YoloRunner | None = None
+        self.counts = {"G": 0, "M": 0, "P": 0, "L": 0}
+        self.last_event = ""
+        self.last_detection: dict | None = None  # GUI 표시용
+        self.latest_frame = None  # GUI 표시용 (annotated)
+        self.restart_camera = threading.Event()
+        self.status_msg = "준비 중"
+        self.stop = threading.Event()
+        self.uploader = Uploader(settings.backend_url, settings.ai_api_token, settings.http_timeout,
+                                 settings.upload_max_attempts, settings.outbox_dir, settings.outbox_max_files)
+        hw_enabled = settings.hw_enabled and not args.no_hw
+        self.hw = HardwareController(hw_enabled, settings.hw_serial_port, settings.hw_baud, settings.hw_busy_sec,
+                                     self.on_serial_line, exclude_ports={settings.esp32_serial_port})
+        self.esp32: SerialLink | None = None
+        if settings.esp32_serial_port and not args.no_hw:
+            # ESP32 USB 로그 모니터 (읽기 전용). ESP32는 명령을 받지 않는다 (esp32.ino 기준)
+            self.esp32 = SerialLink("esp32", settings.esp32_serial_port, settings.esp32_baud, self.on_serial_line,
+                                    reset_wait=0.5)
+        self.trigger = StableTrigger(settings.stable_frames, settings.stable_min_sec, settings.clear_sec,
+                                     settings.send_cooldown)
+        self.heartbeat = Heartbeat(self)
+
+    # --- 시리얼 수신 → 센서 이벤트 ---
+    def on_serial_line(self, who: str, line: str) -> None:
+        log.info("[%s] %s", who, line)
+        kind, sensor = "serial_line", None
+        if "[ALERT]" in line or line.startswith("FULL:"):
+            kind, sensor = "bin_full_alert", (line.split(":", 1)[1] if line.startswith("FULL:") else "TRASH")
+        elif who == "esp32" and "WiFi" not in line and "전송" not in line:
+            return  # ESP32 부팅 로그 등은 서버로 보내지 않음
+        self.uploader.submit_telemetry({
+            "device_id": settings.device_id,
+            "kind": kind,
+            "sensor_id": sensor,
+            "raw": line[:1000],
+            "payload": {"port": who},
+            "source": "hardware",
+            "measured_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    # --- 분류 1회 처리 ---
+    def handle(self, det, annotated) -> None:
+        signal_char = self.signal_map.get(det.class_id)
+        # ① 하드웨어 먼저 (네트워크와 독립)
+        hw_status = self.hw.send(signal_char)
+        if signal_char and hw_status == "command_sent":
+            self.counts[signal_char] += 1
+        detection_id = str(uuid.uuid4())
+        ok, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, settings.jpeg_quality])
+        if not ok:
+            log.error("JPEG 인코딩 실패 → 전송 생략")
+            return
+        meta = {
+            "detection_id": detection_id,
+            "device_id": settings.device_id,
+            "waste_type": det.name.strip().lower(),
+            "class_id": det.class_id,
+            "confidence": round(det.confidence, 4),
+            "model_name": Path(settings.model_path).name,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "bounding_box": dict(zip(("x1", "y1", "x2", "y2"), (round(v, 1) for v in det.box))),
+            "hardware_status": hw_status,
+        }
+        # ② 전송은 큐로 (카메라 루프를 막지 않음)
+        self.uploader.submit_detection(meta, buf.tobytes())
+        self.last_event = f"{det.name} {det.confidence:.2f} hw={hw_status}"
+        self.last_detection = {**meta, "signal": signal_char, "time": time.strftime("%H:%M:%S")}
+        log.info("[분류] %s conf=%.2f signal=%s hw=%s id=%s", det.name, det.confidence, signal_char, hw_status, detection_id)
+
+    def overlay(self, img) -> None:
+        c = self.counts
+        lines = [
+            f"P(L):{c['L']} | M:{c['M']} | G:{c['G']} | Pa:{c['P']}",
+            f"server:{'ON' if self.backend_online else 'OFF'}  serial:{'ON' if self.hw.connected else ('OFF' if self.hw.enabled else 'disabled')}"
+            f"  queue:{self.uploader.pending}  fps:{self.fps:.1f}",
+            f"last: {self.last_event}",
+        ]
+        for i, t in enumerate(lines):
+            cv2.putText(img, t, (20, 40 + 28 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
+
+    def run(self) -> int:
+        code = self.prepare()
+        if code:
+            return code
+        return self.loop()
+
+    def prepare(self) -> int:
+        """설정·모델·카메라 확인 후 백그라운드 스레드 시작. 실패 시 원인을 status_msg 에 남긴다."""
+        for p in settings.problems():
+            log.error("설정 오류: %s", p)
+        if settings.problems():
+            self.status_msg = "설정 오류: " + "; ".join(settings.problems())
+            return 2
+        model_path = Path(settings.model_path)
+        if not model_path.is_absolute():
+            model_path = (EDGE_DIR / model_path) if (EDGE_DIR / model_path).exists() else model_path
+        if not model_path.exists():
+            log.error("모델 파일이 없습니다: %s (MODEL_PATH 확인)", model_path)
+            self.status_msg = f"모델 파일 없음: {model_path}"
+            return 2
+        log.info("YOLO 모델 로드: %s", model_path)
+        probe = YoloRunner(str(model_path), settings.confidence_threshold)
+        self.signal_map = build_signal_map(probe.names)
+        probe.target_ids = sorted(self.signal_map) or None
+        self.yolo = probe
+        log.info("모델 클래스: %s · 대상 class id: %s", probe.names, probe.target_ids)
+
+        self.cap, self.still = open_camera(self.source)
+        if self.still:
+            self.still_frame = cv2.imread(str(self.cap))
+            if self.still_frame is None:
+                log.error("이미지를 읽을 수 없습니다: %s", self.cap)
+                self.status_msg = f"이미지를 읽을 수 없음: {self.cap}"
+                return 2
+        elif not self.cap.isOpened():
+            log.error("카메라를 열 수 없습니다 (CAMERA_INDEX=%s). check_system.py --cameras 로 번호 확인", self.source)
+            self.status_msg = f"카메라를 열 수 없음 (CAMERA_INDEX={self.source})"
+            # 하드웨어·서버 상태는 계속 보고한다
+            self.uploader.start(); self.hw.start(); self.heartbeat.start()
+            return 3
+
+        self.uploader.start()
+        self.hw.start()
+        if self.esp32:
+            self.esp32.start()
+        self.heartbeat.start()
+        log.info("시작: device=%s backend=%s", settings.device_id, settings.backend_url)
+        self.status_msg = "카메라 모드"
+        return 0
+
+    def loop(self) -> int:
+        cap, still = self.cap, self.still
+        still_frame = getattr(self, "still_frame", None)
+        fails, reopen, infer_errors = 0, 0, 0
+        t_prev = time.monotonic()
+        window = settings.show_window and not self.args.headless and not self.args.gui
+        try:
+            while not self.stop.is_set():
+                if self.restart_camera.is_set() and not still:
+                    self.restart_camera.clear()
+                    log.info("카메라 재시작 요청")
+                    cap.release()
+                    time.sleep(0.5)
+                    cap, _ = open_camera(self.source)
+                    self.cap = cap
+                    fails, reopen = 0, 0
+                if still:
+                    frame = still_frame.copy()
+                    ok = True
+                    time.sleep(0.05)
+                else:
+                    ok, frame = cap.read()
+                if not ok or frame is None:
+                    self.camera_ok = False
+                    fails += 1
+                    if fails >= 30:
+                        if reopen >= 5 or not str(self.source).isdigit():
+                            log.error("카메라 프레임 수신 실패가 계속됩니다 → 추론 중지 ('카메라 재시작'으로 재시도)")
+                            self.status_msg = "카메라 끊김 — 케이블 확인 후 '카메라 재시작'"
+                            if self.args.gui:
+                                self.restart_camera.wait()  # GUI 에서 재시작을 누를 때까지 대기 (모터 동작 없음)
+                                if self.stop.is_set():
+                                    break
+                                reopen = 0
+                                continue
+                            return 3
+                        reopen += 1
+                        log.warning("카메라 재연결 시도 %d/5", reopen)
+                        cap.release()
+                        time.sleep(1.0)
+                        cap, _ = open_camera(self.source)
+                        self.cap = cap
+                        fails = 0
+                    else:
+                        time.sleep(0.03)
+                    continue
+                fails, self.camera_ok = 0, True
+                self.status_msg = "카메라 모드"
+                if reopen and not still:
+                    reopen = 0
+
+                try:
+                    result = self.yolo(frame)
+                    infer_errors = 0
+                except Exception as exc:
+                    infer_errors += 1
+                    if infer_errors <= 3:
+                        log.exception("YOLO 추론 오류 (이 프레임 건너뜀)")
+                    self.status_msg = f"YOLO 추론 오류 {infer_errors}회: {exc}"[:200]
+                    if infer_errors >= 3:
+                        time.sleep(1.0)  # 반복 오류 시 로그·CPU 폭주 방지
+                    continue
+                det = top_detection(result, self.yolo.names)
+                annotated = result.plot()
+                if self.trigger.update(det, can_fire=not self.hw.busy):
+                    self.handle(det, annotated)
+
+                now = time.monotonic()
+                self.fps = 0.9 * self.fps + 0.1 * (1.0 / max(now - t_prev, 1e-3))
+                t_prev = now
+                if self.args.max_events and self.uploader.stats.ok + self.uploader.stats.failed >= self.args.max_events:
+                    # 자동 시험용: N건 전송 후 종료
+                    break
+                if self.args.gui:
+                    self.latest_frame = annotated
+                if window:
+                    self.overlay(annotated)
+                    cv2.imshow("SMART RECYCLE - Camera", annotated)
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord("q"):
+                        break
+                    if key == ord("r"):
+                        self.counts = {k: 0 for k in self.counts}
+                        log.info("화면 카운트 초기화 (아두이노에는 아무것도 보내지 않음)")
+        finally:
+            log.info("종료 중…")
+            self.heartbeat.stop_event.set()
+            self.uploader.stop()
+            self.hw.close()
+            if self.esp32:
+                self.esp32.close()
+            if not still:
+                self.cap.release()
+            if window:
+                cv2.destroyAllWindows()
+        return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="SMART RECYCLE camera laptop")
+    ap.add_argument("--source", help="카메라 번호 또는 이미지/동영상 파일 (기본: CAMERA_INDEX)")
+    ap.add_argument("--no-hw", action="store_true", help="시리얼 하드웨어 사용 안 함")
+    ap.add_argument("--headless", action="store_true", help="화면 창 없이 실행")
+    ap.add_argument("--max-events", type=int, default=0, help="N건 전송 후 자동 종료 (시험용)")
+    args = ap.parse_args()
+    args.gui = False
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    app = EdgeApp(args)
+    signal.signal(signal.SIGINT, lambda *_: app.stop.set())
+    return app.run()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

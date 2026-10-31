@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smart-recycle.local/schemas/status.schema.json",
+  "description": "MQTT topic smartbin/{device_id}/status — protocol v1.1 (docs/MQTT_PROTOCOL.md)",
+  "$defs": {
+    "DataSource": {
+      "enum": [
+        "hardware",
+        "simulator"
+      ],
+      "title": "DataSource",
+      "type": "string"
+    },
+    "OperatingMode": {
+      "enum": [
+        "AUTO",
+        "MANUAL"
+      ],
+      "title": "OperatingMode",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "message_type": {
+      "anyOf": [
+        {
+          "const": "status",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message Type"
+    },
+    "message_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message Id"
+    },
+    "device_id": {
+      "pattern": "^DEVICE_\\d{3}$",
+      "title": "Device Id",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "online",
+        "offline"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DataSource"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "operating_mode": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OperatingMode"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "estop_active": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Estop Active"
+    },
+    "busy": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Busy"
+    },
+    "firmware_version": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Firmware Version"
+    },
+    "error_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Code"
+    },
+    "timestamp": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timestamp"
+    }
+  },
+  "required": [
+    "device_id",
+    "state"
+  ],
+  "title": "StatusPayload",
+  "type": "object"
+}

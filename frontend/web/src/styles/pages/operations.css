@@ -1,0 +1,404 @@
+/* 운영 (SERVICE_RESTRUCTURE §3): 긴급정지 · 모드 · 수동 배출 · 테스트 · 점검 기록 */
+.estop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3) var(--s5);
+  min-height: 72px;
+  padding: var(--s3) var(--s3) var(--s3) var(--s5);
+  border: 2px solid var(--critical);
+  border-radius: var(--r-estop);
+  background: var(--critical-wash);
+}
+.estop__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.estop__title {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  color: var(--critical);
+}
+.estop__desc {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+.estop__actions {
+  display: grid;
+  justify-items: end;
+  gap: var(--s1);
+}
+.estop__btn {
+  min-width: 200px;
+  height: 52px;
+  padding: 0 var(--s6);
+  border: 0;
+  border-radius: var(--r-estop);
+  background: var(--critical);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.22);
+}
+.estop__btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--critical) 86%, #000);
+}
+.estop__btn:active:not(:disabled) {
+  box-shadow: none;
+  transform: translateY(1px);
+}
+.estop__btn:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+.estop__btn:disabled {
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--critical) 40%, var(--surface-sunken));
+  color: var(--surface);
+  box-shadow: none;
+}
+.estop[data-active] {
+  background: var(--critical);
+}
+.estop[data-active] .estop__title,
+.estop[data-active] .estop__desc,
+.estop[data-active] .reason--on-strip {
+  color: #fff;
+}
+.estop[data-active] .btn {
+  border-color: #fff;
+  background: #fff;
+  color: #16181b;
+}
+.estop[data-active] .btn:disabled {
+  opacity: 0.7;
+}
+.reason--on-strip {
+  max-width: 34ch;
+  text-align: right;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.ctl-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--s7);
+}
+.ctl-main {
+  grid-column: span 7;
+  display: grid;
+  align-content: start;
+  gap: var(--s6);
+  min-width: 0;
+}
+.ctl-side {
+  grid-column: span 5;
+  display: grid;
+  align-content: start;
+  gap: var(--s6);
+  min-width: 0;
+}
+
+.mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s4) var(--s6);
+}
+.ctl-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s5);
+  font-size: 14px;
+}
+.ctl-summary dt {
+  font-size: var(--fs-caption);
+  color: var(--ink-3);
+}
+.ctl-aux {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule);
+}
+
+.actuators {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.actuator {
+  position: relative;
+  display: grid;
+  gap: var(--s2);
+  justify-items: start;
+  padding: var(--s4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--t-state);
+}
+.actuator input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.actuator:hover {
+  border-color: var(--ink-3);
+}
+.actuator:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.actuator[data-selected] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+.actuator[data-selected]::after {
+  content: '선택됨';
+  position: absolute;
+  top: var(--s3);
+  right: var(--s3);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+}
+.actuator__name {
+  font-weight: 600;
+}
+.actuator__fill {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: var(--s2);
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.actuators:disabled .actuator {
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--ink-3);
+}
+.actuators:disabled .mcode {
+  opacity: 0.55;
+}
+.actuate {
+  display: grid;
+  justify-items: start;
+  gap: var(--s2);
+}
+
+/* 명령 진행 */
+.cprog {
+  display: grid;
+  gap: var(--s4);
+}
+.cprog-idle {
+  color: var(--ink-3);
+  font-size: 14px;
+}
+.cprog__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-weight: 600;
+}
+.cprog__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s2);
+  counter-reset: step;
+}
+.cprog__steps li {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding-top: var(--s2);
+  border-top: 3px solid var(--rule);
+  color: var(--ink-3);
+  transition: border-color var(--t-state);
+  counter-increment: step;
+}
+.cprog__label::before {
+  content: counter(step) '. ';
+}
+.cprog__steps li[data-state='done'] {
+  border-top-color: var(--ink);
+  color: var(--ink);
+}
+.cprog__steps li[data-state='current'] {
+  border-top-color: var(--accent);
+  color: var(--ink);
+}
+.cprog__steps li[data-state='failed'] {
+  border-top-color: var(--critical);
+  color: var(--critical);
+}
+.cprog__label {
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+.cprog__detail {
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  color: var(--ink-2);
+}
+.cprog__steps li[data-state='failed'] .cprog__detail {
+  color: var(--critical);
+}
+.cprog__outcome {
+  display: grid;
+  gap: 2px;
+  padding: var(--s3) var(--s4);
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+}
+.cprog__outcome[data-tone='ok'] {
+  border-left-color: var(--ok);
+}
+.cprog__outcome[data-tone='ok'] strong {
+  color: var(--ok);
+}
+.cprog__outcome[data-tone='critical'] {
+  border-left-color: var(--critical);
+  background: var(--critical-wash);
+}
+.cprog__outcome[data-tone='critical'] strong {
+  color: var(--critical);
+}
+.cprog__outcome[data-tone='warning'] {
+  border-left-color: var(--warning);
+  background: var(--warning-wash);
+}
+.cprog__outcome[data-tone='warning'] strong {
+  color: var(--warning);
+}
+.cprog__outcome strong {
+  font-size: 17px;
+  line-height: 24px;
+}
+.cprog__reason {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+/* 유일한 반복 애니메이션: ACK 대기 (reduced-motion 이면 정지) */
+.cprog__wait {
+  position: relative;
+  width: 64px;
+  height: 2px;
+  margin-top: var(--s1);
+  background: var(--rule);
+  overflow: hidden;
+}
+.cprog__wait::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: var(--accent);
+  animation: ack-wait 1.2s ease-in-out infinite;
+}
+@keyframes ack-wait {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+
+@media (max-width: 1279px) {
+  .ctl-grid {
+    gap: var(--s5);
+  }
+  .ctl-main,
+  .ctl-side {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 767px) {
+  .estop {
+    padding: var(--s3);
+  }
+  .estop__actions {
+    width: 100%;
+    justify-items: stretch;
+  }
+  .estop__btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .reason--on-strip {
+    text-align: left;
+    max-width: none;
+  }
+  .actuators {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .actuate .btn {
+    width: 100%;
+  }
+  .seg--lg {
+    width: 100%;
+  }
+  .seg--lg button {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* 모터·센서 테스트 */
+.test-table th[scope='row'] {
+  white-space: nowrap;
+}
+.btn-pair {
+  display: inline-flex;
+  gap: var(--s2);
+}
+.motor-fail {
+  display: grid;
+  gap: 2px;
+}
+
+/* 점검 기록 작성 */
+.mform {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s3);
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--rule);
+}
+.mform select,
+.mform input {
+  width: 100%;
+}
+.mform__note,
+.mform__act {
+  grid-column: 1 / -1;
+}
+.mform__act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+  font-size: 14px;
+}
+@media (max-width: 767px) {
+  .mform {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

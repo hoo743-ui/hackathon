@@ -1,0 +1,12 @@
+.env
+.venv/
+venv/
+__pycache__/
+outbox/
+captures/
+models/*.pt
+*.pt
+build/
+dist/
+*.spec
+logs/

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smart-recycle.local/schemas/command.schema.json",
+  "description": "서버 → 장치 명령 (retain 금지). v1 필드(command/requested_at)와 v1.1 별칭(action/issued_at)을 함께 보낸다.",
+  "$defs": {
+    "CommandType": {
+      "enum": [
+        "OPEN_BIN",
+        "SET_MODE",
+        "EMERGENCY_STOP",
+        "RESET_ESTOP",
+        "GET_STATUS"
+      ],
+      "title": "CommandType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "message_type": {
+      "const": "command",
+      "default": "command",
+      "title": "Message Type",
+      "type": "string"
+    },
+    "command_id": {
+      "format": "uuid",
+      "title": "Command Id",
+      "type": "string"
+    },
+    "device_id": {
+      "title": "Device Id",
+      "type": "string"
+    },
+    "command": {
+      "$ref": "#/$defs/CommandType"
+    },
+    "target": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Target"
+    },
+    "bin_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bin Id"
+    },
+    "origin": {
+      "default": "manual",
+      "enum": [
+        "manual",
+        "auto"
+      ],
+      "title": "Origin",
+      "type": "string"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "title": "Requested At",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "message_id": {
+      "format": "uuid",
+      "readOnly": true,
+      "title": "Message Id",
+      "type": "string"
+    },
+    "action": {
+      "$ref": "#/$defs/CommandType",
+      "readOnly": true
+    },
+    "issued_at": {
+      "format": "date-time",
+      "readOnly": true,
+      "title": "Issued At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "command_id",
+    "device_id",
+    "command",
+    "target",
+    "requested_at",
+    "expires_at",
+    "message_id",
+    "action",
+    "issued_at"
+  ],
+  "title": "CommandMessage",
+  "type": "object"
+}

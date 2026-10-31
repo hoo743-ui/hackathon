@@ -1,0 +1,75 @@
+/* 차트: 범례 · 툴팁 · 스파크라인 */
+.chart {
+  width: 100%;
+  min-width: 0;
+}
+.chart .recharts-cartesian-axis-tick-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s5);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+}
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.chart-legend__swatch {
+  width: 16px;
+  height: 2px;
+}
+.chart-legend__note {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: var(--fs-caption);
+}
+.chart-legend__err {
+  display: inline-block;
+  width: 2px;
+  height: 10px;
+  background: var(--critical);
+}
+
+.chart-tip {
+  min-width: 140px;
+  padding: var(--s2) var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-top: 2px solid var(--ink);
+  box-shadow: var(--shadow-overlay);
+  font-size: var(--fs-label);
+}
+.chart-tip__time {
+  margin-bottom: var(--s1);
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.chart-tip li {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 2px 0;
+}
+.chart-tip__val {
+  margin-left: auto;
+  font-weight: 500;
+}
+
+.spark {
+  display: block;
+  overflow: visible;
+}
+.spark--empty {
+  display: inline-block;
+  color: var(--ink-3);
+  font-size: var(--fs-caption);
+}
+.chart {
+  overflow: hidden;
+}

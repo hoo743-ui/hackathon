@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smart-recycle.local/schemas/telemetry.schema.json",
+  "description": "MQTT topic smartbin/{device_id}/telemetry — protocol v1.1 (docs/MQTT_PROTOCOL.md)",
+  "$defs": {
+    "DataSource": {
+      "enum": [
+        "hardware",
+        "simulator"
+      ],
+      "title": "DataSource",
+      "type": "string"
+    },
+    "SensorStatus": {
+      "enum": [
+        "normal",
+        "out_of_range",
+        "timeout",
+        "error"
+      ],
+      "title": "SensorStatus",
+      "type": "string"
+    },
+    "TelemetryBin": {
+      "properties": {
+        "bin_id": {
+          "pattern": "^BIN_\\d{3}$",
+          "title": "Bin Id",
+          "type": "string"
+        },
+        "waste_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WasteType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "distance_cm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Distance Cm"
+        },
+        "sensor_status": {
+          "$ref": "#/$defs/SensorStatus"
+        },
+        "samples_valid": {
+          "anyOf": [
+            {
+              "maximum": 50,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Samples Valid"
+        }
+      },
+      "required": [
+        "bin_id",
+        "sensor_status"
+      ],
+      "title": "TelemetryBin",
+      "type": "object"
+    },
+    "WasteType": {
+      "enum": [
+        "plastic",
+        "metal",
+        "paper",
+        "glass"
+      ],
+      "title": "WasteType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "message_type": {
+      "anyOf": [
+        {
+          "const": "telemetry",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message Type"
+    },
+    "message_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message Id"
+    },
+    "device_id": {
+      "pattern": "^DEVICE_\\d{3}$",
+      "title": "Device Id",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/DataSource"
+    },
+    "timestamp": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timestamp"
+    },
+    "bins": {
+      "items": {
+        "$ref": "#/$defs/TelemetryBin"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Bins",
+      "type": "array"
+    }
+  },
+  "required": [
+    "device_id",
+    "source",
+    "bins"
+  ],
+  "title": "TelemetryPayload",
+  "type": "object"
+}

@@ -1,0 +1,74 @@
+name: smartbin
+
+services:
+  postgres:
+    image: postgres:16.6-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    entrypoint: ["/bin/sh", "/mosquitto/config/entrypoint.sh"]
+    environment:
+      MQTT_BACKEND_USERNAME: ${MQTT_BACKEND_USERNAME}
+      MQTT_BACKEND_PASSWORD: ${MQTT_BACKEND_PASSWORD}
+      MQTT_SIMULATOR_USERNAME: ${MQTT_SIMULATOR_USERNAME}
+      MQTT_SIMULATOR_PASSWORD: ${MQTT_SIMULATOR_PASSWORD}
+      MQTT_DEVICE_USERNAME: ${MQTT_DEVICE_USERNAME}
+      MQTT_DEVICE_PASSWORD: ${MQTT_DEVICE_PASSWORD}
+    ports:
+      # 기본은 로컬 전용. 실제 ESP32 연결 시 .env에서 MQTT_BIND_ADDRESS=0.0.0.0 (LAN 한정, 공유기 포트포워딩 금지)
+      - "${MQTT_BIND_ADDRESS:-127.0.0.1}:${MQTT_PORT:-1883}:1883"
+      # TLS (scripts/gen-mqtt-certs.sh 로 인증서 생성 시 활성). 인터넷 경유 장치는 이 포트만 사용
+      - "${MQTT_TLS_BIND_ADDRESS:-127.0.0.1}:${MQTT_TLS_PORT:-8883}:8883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/entrypoint.sh:/mosquitto/config/entrypoint.sh:ro
+      - ./mosquitto/certs:/mosquitto/certs:ro
+      - mosquitto-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /mosquitto/data/passwd && pgrep mosquitto"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # 전체 Docker 실행용 (scripts/stack-up.sh). 개발 중에는 scripts/backend.sh로 로컬 실행을 권장.
+  backend:
+    profiles: ["full"]
+    build: ../backend
+    env_file: ../.env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+    ports:
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mosquitto-data:
