@@ -61,7 +61,13 @@ export function EdgeLine({ edges }: { edges: EdgeStatus[] }) {
         const parts = [
           `카메라 ${e.online && e.camera_ok ? '정상' : '끊김'}`,
           `모델 ${e.online && e.model_loaded ? '정상' : '없음'}`,
-          e.serial_enabled ? `하드웨어 ${e.online && e.serial_connected ? '연결' : '미연결'}` : '하드웨어 비활성',
+          e.serial_enabled ? `UNO ${e.online && e.serial_connected ? '연결' : '미연결'}` : '하드웨어 비활성',
+          `서보 성공 ${e.sorted_ok ?? 0}/실패 ${e.sorted_failed ?? 0}`,
+          e.sensor_status === 'normal'
+            ? `거리 ${e.distance_cm ?? '--'}cm · 적재율 ${e.fill_percent != null ? `${e.fill_percent}%` : '--'}`
+            : e.sensor_status === 'disconnected'
+              ? 'SENSOR_DISCONNECTED'
+              : '센서 수신 없음',
           `전송 대기 ${e.upload_queue}`,
         ];
         return (

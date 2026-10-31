@@ -86,7 +86,16 @@ async def record_telemetry(session: AsyncSession, t: TelemetryIn) -> EdgeTelemet
     await session.commit()
     await session.refresh(row)
     await ws_manager.broadcast("telemetry", TelemetryOut.model_validate(row).model_dump(mode="json"))
+    if t.kind == "distance":
+        await apply_distance(session, t)
     return row
+
+
+async def latest_distance(session: AsyncSession) -> TelemetryOut | None:
+    row = await session.scalar(
+        select(EdgeTelemetry).where(EdgeTelemetry.kind == "distance").order_by(EdgeTelemetry.measured_at.desc()).limit(1)
+    )
+    return TelemetryOut.model_validate(row) if row else None
 
 
 async def latest_full_alert(session: AsyncSession) -> TelemetryOut | None:
@@ -94,3 +103,52 @@ async def latest_full_alert(session: AsyncSession) -> TelemetryOut | None:
         select(EdgeTelemetry).where(EdgeTelemetry.kind == "bin_full_alert").order_by(EdgeTelemetry.measured_at.desc()).limit(1)
     )
     return TelemetryOut.model_validate(row) if row else None
+
+
+async def apply_distance(session: AsyncSession, t: TelemetryIn) -> None:
+    """kind=distance: HC-SR04 1개 측정값 → 지정 칸의 거리·적재율·센서 상태.
+
+    적재율 = fill_level.compute_fill_percent (시스템 유일 구현).
+    칸에 보정값(empty/full)이 있으면 그것을, 없으면 카메라 노트북이 보낸 empty_distance_cm 와 full=0 을 쓴다
+    → (1 - 측정거리/빈통거리) × 100. 측정 실패·끊김이면 마지막 정상값을 덮어쓰지 않는다 (값을 만들지 않음).
+    """
+    from app.core.enums import SensorStatus
+    from app.models import Bin, SensorLog
+    from app.services.fill_level import compute_fill_percent
+    from app.services.serializers import bin_out
+
+    p = t.payload or {}
+    bin_id = settings.edge_sensor_bin_id or p.get("bin_id")
+    if not bin_id:
+        return
+    b = await session.scalar(select(Bin).where(Bin.bin_id == str(bin_id)))
+    if b is None:
+        logger.warning("distance telemetry for unknown bin %s", bin_id)
+        return
+    try:
+        status = SensorStatus(p.get("sensor_status", "normal"))
+    except ValueError:
+        status = SensorStatus.ERROR
+    distance = p.get("distance_cm")
+    if status == SensorStatus.NORMAL:
+        if not isinstance(distance, (int, float)) or not (settings.sensor_min_distance_cm <= distance <= settings.sensor_max_distance_cm):
+            status, distance = SensorStatus.OUT_OF_RANGE, None
+    else:
+        distance = None
+    empty, full = b.empty_distance_cm, b.full_distance_cm
+    if empty is None or full is None:
+        e = p.get("empty_distance_cm")
+        empty, full = (float(e), 0.0) if isinstance(e, (int, float)) and e > 0 else (None, None)
+    fill = compute_fill_percent(distance, empty, full) if distance is not None else None
+    now = utcnow()
+    measured = t.measured_at or now
+    session.add(SensorLog(device_id=b.device_id, bin_id=b.bin_id, distance_cm=distance, fill_percent=fill,
+                          sensor_status=status, source=t.source, measured_at=measured, received_at=now))
+    b.sensor_status = status
+    b.updated_at = now
+    if status == SensorStatus.NORMAL:
+        b.current_distance_cm = distance
+        b.current_fill_percent = fill
+        b.last_valid_at = measured
+    await session.commit()
+    await ws_manager.broadcast("bins.updated", [bin_out(b).model_dump(mode="json")])

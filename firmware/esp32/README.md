@@ -1,3 +1,5 @@
+> ⚠️ **해커톤 시연에는 사용하지 않는다.** 이 펌웨어는 ESP32 가 서보 4개·초음파 4개를 직접 제어하는 원래(MQTT) 설계다. 실제 장비는 `firmware/uno_controller` (UNO: 서보 3개·초음파 1개) + `firmware/esp32_bridge` 를 쓴다 — `docs/HARDWARE_WIRING.md`.
+
 # ESP32 펌웨어 (DEVICE_001)
 
 > ⚠️ **실제 하드웨어에서 한 번도 테스트하지 않았다.** `pio run` 빌드(컴파일)만 확인했다.

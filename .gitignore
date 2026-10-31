@@ -48,3 +48,5 @@ logs/
 
 # 분류 이미지 (맥북 로컬 저장소)
 backend/data/
+firmware/esp32_bridge/secrets.h
+.pio/

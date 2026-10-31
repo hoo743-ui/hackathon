@@ -16,10 +16,11 @@ from app.schemas.api import (
     DevicesStatusOut,
     EdgeHeartbeatIn,
     EdgeStatusOut,
+    HardwareStatusIn,
     TelemetryIn,
     TelemetryOut,
 )
-from app.services import edge_service, image_store
+from app.services import detection_service, edge_service, image_store
 from app.services.serializers import busy_device_ids, detection_out, device_out
 
 # /api/devices/{device_id} 보다 먼저 등록해야 하는 경로
@@ -36,6 +37,7 @@ async def devices_status(request: Request, session: AsyncSession = Depends(get_s
         edges=edge_service.edge_statuses(),
         devices=[device_out(d, d.device_id in busy) for d in devices],
         latest_full_alert=await edge_service.latest_full_alert(session),
+        latest_distance=await edge_service.latest_distance(session),
         server_time=utcnow(),
     )
 
@@ -86,3 +88,10 @@ async def list_telemetry(
 @router.post("/edge/heartbeat", response_model=EdgeStatusOut)
 async def post_heartbeat(hb: EdgeHeartbeatIn, session: AsyncSession = Depends(get_session), _: str = Depends(require_ai_token)):
     return await edge_service.heartbeat(session, hb)
+
+
+@router.post("/detections/{detection_id}/hardware", response_model=DetectionOut)
+async def post_hardware_status(detection_id: UUID, body: HardwareStatusIn, session: AsyncSession = Depends(get_session),
+                               _: str = Depends(require_ai_token)):
+    """카메라 노트북 → 장치 ACK 결과 (completed / ack_timeout / rejected_busy …)."""
+    return detection_out(await detection_service.update_hardware_status(session, detection_id, body.hardware_status))

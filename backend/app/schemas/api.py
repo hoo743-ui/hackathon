@@ -109,6 +109,7 @@ class DashboardOut(BaseModel):
     hardware_mode: str = "SIMULATOR"
     edges: list["EdgeStatusOut"] = []
     latest_full_alert: "TelemetryOut | None" = None
+    latest_distance: "TelemetryOut | None" = None
 
 
 class BinStatisticsOut(BaseModel):
@@ -267,6 +268,10 @@ class TelemetryIn(BaseModel):
     measured_at: datetime | None = None
 
 
+class HardwareStatusIn(BaseModel):
+    hardware_status: HardwareStatus
+
+
 class TelemetryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -296,6 +301,14 @@ class EdgeHeartbeatIn(BaseModel):
     serial_port: str | None = Field(default=None, max_length=64)
     esp32_port: str | None = Field(default=None, max_length=64)
     esp32_connected: bool = False
+    # UNO 펌웨어 종류: uno_controller(ACK·거리 지원) | legacy(trush.ino, 응답 없음) | unknown
+    uno_firmware: str | None = Field(default=None, max_length=32)
+    servo_state: str | None = Field(default=None, max_length=32)  # idle | moving | unverified | error
+    sensor_status: str | None = Field(default=None, max_length=24)
+    distance_cm: float | None = None
+    fill_percent: float | None = None
+    sorted_ok: int = 0
+    sorted_failed: int = 0
     upload_queue: int = 0
     uploads_ok: int = 0
     uploads_failed: int = 0
@@ -313,6 +326,7 @@ class DevicesStatusOut(BaseModel):
     edges: list[EdgeStatusOut]
     devices: list[DeviceOut]
     latest_full_alert: TelemetryOut | None = None
+    latest_distance: TelemetryOut | None = None
     server_time: datetime
 
 

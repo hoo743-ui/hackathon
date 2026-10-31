@@ -5,6 +5,8 @@ os.environ["POSTGRES_DB"] = "smartbin_test"
 os.environ["DB_NULL_POOL"] = "true"
 os.environ["MQTT_ENABLED"] = "false"
 os.environ["AI_API_TOKEN"] = "test-ai-token"
+os.environ["HARDWARE_MODE"] = "SIMULATOR"  # 루트 .env(EDGE_SERIAL)와 무관하게 기존 시험은 시뮬레이터 기준
+os.environ["EDGE_SENSOR_BIN_ID"] = ""
 
 import asyncio  # noqa: E402
 import subprocess  # noqa: E402

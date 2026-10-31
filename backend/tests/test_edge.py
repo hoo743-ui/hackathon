@@ -171,3 +171,50 @@ def test_ws_alias_path():
     with TestClient(app).websocket_connect("/ws") as ws:
         hello = ws.receive_json()
         assert hello["type"] == "connected" and hello["event"] == "connected"
+
+
+async def test_ack_updates_outcome(client, events):
+    m = meta(hardware_status="command_sent")
+    await upload(client, m)
+    r = await client.post(f"/api/detections/{m['detection_id']}/hardware", json={"hardware_status": "completed"}, headers=AI)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["hardware_status"] == "completed" and d["outcome"] == "SORTED" and d["outcome_detail"] == "ACK_DONE"
+    m2 = meta()
+    await upload(client, m2)
+    d2 = (await client.post(f"/api/detections/{m2['detection_id']}/hardware", json={"hardware_status": "ack_timeout"}, headers=AI)).json()
+    assert d2["outcome"] == "SORT_FAILED" and d2["outcome_detail"] == "ACK_TIMEOUT"
+    missing = await client.post(f"/api/detections/{uuid.uuid4()}/hardware", json={"hardware_status": "completed"}, headers=AI)
+    assert missing.status_code == 404
+    assert (await client.post(f"/api/detections/{m['detection_id']}/hardware", json={"hardware_status": "completed"})).status_code == 401
+
+
+async def dist(client, **payload):
+    return await client.post("/api/telemetry", json={"device_id": "CAMERA_001", "kind": "distance", "payload": payload}, headers=AI)
+
+
+async def test_distance_to_fill_percent(client, events):
+    # (1 - 측정거리/빈통거리) × 100 = (1 - 15/30) × 100 = 50
+    assert (await dist(client, bin_id="BIN_001", distance_cm=15.0, empty_distance_cm=30.0, sensor_status="normal")).status_code == 201
+    b = (await client.get("/api/bins/BIN_001")).json()
+    assert b["current_distance_cm"] == 15.0 and b["current_fill_percent"] == 50.0 and b["sensor_status"] == "normal"
+    assert "bins.updated" in events.types()
+    # 끊김 → 상태만 바뀌고 마지막 정상값 유지 (값을 만들지 않음)
+    await dist(client, bin_id="BIN_001", sensor_status="disconnected")
+    b = (await client.get("/api/bins/BIN_001")).json()
+    assert b["sensor_status"] == "disconnected" and b["current_fill_percent"] == 50.0
+    # 범위 밖 값 → out_of_range
+    await dist(client, bin_id="BIN_001", distance_cm=999, empty_distance_cm=30.0, sensor_status="normal")
+    assert (await client.get("/api/bins/BIN_001")).json()["sensor_status"] == "out_of_range"
+    # 빈통 거리 없으면 적재율 계산 안 함
+    await dist(client, bin_id="BIN_002", distance_cm=10.0, sensor_status="normal")
+    b2 = (await client.get("/api/bins/BIN_002")).json()
+    assert b2["current_distance_cm"] == 10.0 and b2["current_fill_percent"] is None
+    s = (await client.get("/api/devices/status")).json()
+    assert s["latest_distance"]["payload"]["bin_id"] == "BIN_002"
+
+
+async def test_distance_without_bin_is_only_logged(client):
+    await dist(client, distance_cm=12.0, sensor_status="normal")
+    bins = (await client.get("/api/bins")).json()
+    assert all(b["current_distance_cm"] is None for b in bins)

@@ -2,6 +2,7 @@
 
 - 기록일: 2026-10-31 (해커톤 전날)
 - 표기: **PASS** 실제 실행 성공 · **FAIL** 실패 · **NOT TESTED** 장비/다른 컴퓨터가 없어 실행하지 못함 · **SKIPPED** 이유 있는 생략
+- **[SIM]** = 실제 보드 대신 pty 가짜 `uno_controller`(edge/tests/fake_uno.py)로 실행한 시험. 프로토콜·스레드·서버 경로만 확인하며 **하드웨어 시험이 아니다.**
 - **[SUBST]** = 실제 `best_model.pt` 대신 공개 COCO 모델(`yolov8n.pt`)·Ultralytics 예제 사진(bus.jpg, zidane.jpg)으로 돌린 시험. 추론은 실제로 수행했지만 **쓰레기 분류 시험이 아니다.**
 
 ## 1. 시험 환경 (이 기록을 만든 환경)
@@ -38,6 +39,21 @@
 | 백엔드 재시작 → WS 재연결 | 자동 재연결·재동기화 | **NOT TESTED (실기)** | 기존 `RealtimeClient` 지수 백오프 + 재연결 시 스냅샷 재조회 로직은 기존 단위 시험 범위 |
 | 실제 투입 횟수 = 서버 기록 | 일치 | **NOT TESTED** | 판정 로직 단위 시험만 통과 |
 
+## 2-1. 2차 (확정 하드웨어: UNO·ESP32·HC-SR04 ×1·SG90 ×3, Windows 배포, 추론 전용)
+| 시험 | 결과 | 근거 |
+|---|---|---|
+| 백엔드 시험 | **PASS** | 95 passed (+ ACK 결과 갱신, 거리→적재율 50.0%, 끊김 시 마지막 정상값 유지, 범위 밖 out_of_range, 빈통 거리 없으면 미계산) |
+| 카메라 클라이언트 시험 | **PASS [SIM]** | 14 passed: ACK DONE 일 때만 `completed`, START/DONE 없으면 `ack_timeout`, 구 펌웨어는 성공으로 안 바뀜, 동작 중 추가 명령 차단, 비상정지 `aborted`, 중앙값 필터·error·SENSOR_DISCONNECTED |
+| 웹 / 앱 시험 | **PASS** | vitest 67 · jest 54 · tsc OK |
+| 거리→서버 적재율 E2E | **PASS [SIM][SUBST]** | 가짜 UNO `DIST:15.0` · 빈통 30cm → 서버 BIN_001 `15.0cm / 50.0% / normal`; DIST 중단 5초 → `disconnected` |
+| UNO 펌웨어 판별 | **PASS [SIM]** | `?` → `HELLO:UNO_CTRL:1` → "uno_controller (ACK·거리 지원)" |
+| GUI 실행 | **PASS (macOS) [SIM][SUBST]** | 새 상태 줄(모델·INFERENCE ONLY·장치·FPS·UNO·서보×3·HC-SR04·ESP32·서버) 표시 중 예외 없음 |
+| esp32_bridge 컴파일 | **PASS** | PlatformIO `esp32dev` 빌드 성공 (Flash 84%) |
+| uno_controller 컴파일 | **NOT TESTED** | 이 맥에서 AVR 툴체인 실행 불가(Error 126). Arduino API 스텁으로 문법·타입 검사만 PASS → 카메라 PC 의 Arduino IDE 에서 업로드 시 확인 |
+| 실제 서보 3개 / HC-SR04 / ESP32 UART | **NOT TESTED** | 장비 없음 |
+| Windows EXE 빌드·실행 | **NOT TESTED** | Windows 기기 없음 (macOS 빌드는 PASS) |
+| best_model.pt 클래스 확인 | **NOT TESTED** | 모델 파일 없음 |
+
 ## 3. 실패·수정한 항목
 | 항목 | 원인 | 해결 |
 |---|---|---|
@@ -45,11 +61,14 @@
 | Alembic 다중 head | 새 리비전의 부모를 잘못 지정 | `down_revision=bbe2ecfec0d9` |
 | `request.form(max_part_size)` 오류 | 설치된 Starlette 버전 미지원 인자 | 인자 제거 (크기는 읽은 뒤 검사) |
 | EXE 추론 실패 `torchvision::nms does not exist` | PyInstaller가 torchvision C++ 연산 미수집 | 빌드에 `--collect-all torchvision`, 추론 오류 반복 시 1초 대기·상태 표시 |
+| 기존 MQTT 시험 13건 실패 | 루트 `.env` 를 EDGE_SERIAL 로 바꾼 뒤 시험이 그 값을 읽음 | `conftest.py` 에서 시험 모드를 SIMULATOR 로 고정 |
+| 가짜 장치 시험 종료 시 멈춤 | pty fd 를 읽는 스레드가 막힌 상태에서 close | `select` 루프로 변경 |
 | Homebrew Python에 tkinter 없음 | python-tk 미설치 | `brew install python-tk@3.12` (Windows python.org 설치본은 기본 포함) |
 
 ## 4. 남은 위험
 1. **best_model.pt 의 클래스 순서/이름 미확인** — 첫 실행 로그의 "클래스 매핑" 줄을 반드시 확인.
-2. **Arduino ACK 없음** — 모터가 실제로 움직였는지 시스템은 모른다. 화면은 "명령 전송됨"까지만 표시.
+2. **ACK 의 의미** — uno_controller 의 `ACK:DONE` 은 "서보 동작 순서 완료"이지 투하 성공 센서 확인이 아니다. 원본 trush.ino 를 쓰면 성공 확인 자체가 불가.
+2-1. **uno_controller 미컴파일** — 현장에서 Arduino IDE 업로드가 실패하면 원본 trush.ino 로 대체 (적재율·성공 확인 불가 상태로 시연).
 3. **8000 포트 충돌** — 맥북의 예전 백엔드를 끄지 않으면 `start_server.sh` 가 중단된다.
 4. **Wi-Fi 클라이언트 격리** — 행사장 Wi-Fi면 기기 간 통신이 막힐 수 있음 → 핫스팟 준비.
 5. **D3→GPIO16 5V 직결 가능성** — ESP32 손상 위험. 분압 확인 전에는 ESP32 RX 선을 빼 둔다 (시연에 ESP32 경로는 필요 없음).
@@ -59,13 +78,17 @@
 ## 5. 현장 리허설 체크 (실제 장비로 채울 것)
 | # | 항목 | 결과 | 비고 |
 |---|---|---|---|
-| 1 | `SMART_RECYCLE_AI.exe` 실행 · 7개 상태 표시 | | |
+| 0 | UNO 에 uno_controller 업로드 → 시리얼 모니터 `HELLO:UNO_CTRL:1`·`DIST:` → 모니터 닫기 | | |
+| 0-1 | 서보 혼 떼고 `L/M/P/G` 각 1회 → X 각도가 실제 칸과 일치, `ACK:…:DONE` | | |
+| 1 | `SMART_RECYCLE_AI.exe` 실행 · 상태 줄 모두 초록 · 추론 장치 표시 | | |
 | 2 | 카메라 영상 | | |
 | 3 | 플라스틱/금속/종이/유리 각 1개 → 올바른 클래스 | | |
 | 4 | 각 투입 1회당 서보 1회 · 올바른 칸 | | |
 | 5 | 투입 4회 → 서버 이력 정확히 4건 | | |
 | 6 | 웹·폰에 같은 Detection ID · 같은 이미지 | | `ws_consistency_check.py` |
-| 7 | 초음파 5cm 이내 → 웹 "만차 감지" | | |
+| 7 | 손으로 센서 가리기 → GUI 거리·적재율 변화 → 웹·앱 해당 칸 적재율 반영 | | |
+| 7-1 | HC-SR04 선 뽑기 → 5초 내 SENSOR_DISCONNECTED (GUI·웹) | | |
+| 7-2 | 동작 중 비상 정지 → 서보 대기 자세, 해당 분류 "중단" | | |
 | 8 | 카메라 노트북 Wi-Fi 끊기 → 투입 → 다시 연결 → 자동 재전송, 중복 없음 | | |
 | 9 | Arduino USB 뽑기 → GUI 빨강, 모터 명령 없음 → 다시 꽂고 "연결 재확인" | | |
 | 10 | 맥북 백엔드 재시작 → 웹·앱 자동 재연결 | | |

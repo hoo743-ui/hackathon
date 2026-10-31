@@ -16,7 +16,8 @@
         "normal",
         "out_of_range",
         "timeout",
-        "error"
+        "error",
+        "disconnected"
       ],
       "title": "SensorStatus",
       "type": "string"

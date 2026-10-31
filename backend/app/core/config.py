@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     hardware_mode: Literal["SIMULATOR", "ESP32_REAL", "EDGE_SERIAL"] = "SIMULATOR"
     # EDGE_SERIAL: 카메라 노트북의 분류를 기록할 분리수거함 장치 ID (DB devices)
     edge_bin_device_id: str = "DEVICE_001"
+    # HC-SR04 1개가 측정하는 칸 (예: BIN_001). 비우면 거리만 기록하고 적재율은 계산하지 않음
+    edge_sensor_bin_id: str = ""
     # 카메라 노트북 heartbeat가 이 시간 동안 없으면 offline
     edge_offline_after_sec: float = 15
     # 분류 이미지 저장 위치 (backend/ 기준 상대경로 또는 절대경로)

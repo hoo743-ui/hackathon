@@ -85,3 +85,15 @@
 
 ### REMOVE
 - 없음. (`firmware/esp32/` PlatformIO MQTT 펌웨어는 실제 배선과 맞지 않아 **이번 시연에 사용하지 않지만** 삭제하지 않음)
+
+## 5. 2차 반영 — 확정 하드웨어 (UNO ×1 · ESP32 ×1 · HC-SR04 ×1 · SG90 ×3)
+| 요구 | 기존 상태 | 조치 |
+|---|---|---|
+| 서보 3개 | trush.ino 가 이미 3개(X D9·Y1 D10·Y2 D11) | 그대로. 4클래스 = X 의 4개 각도 (`HARDWARE_WIRING.md` 1절) |
+| 초음파 1개로 적재율 | trush.ino 는 5cm 임계 알림만, 거리값 없음 | **ADD** `firmware/uno_controller` — 같은 핀·각도·시간 + `DIST:<cm>` + ACK + 비상정지 (원본 유지) |
+| 실제 응답이 있을 때만 성공 | trush.ino 는 응답 없음 | `ACK:<c>:DONE` → `completed` → 서버 `SORTED`. 구 펌웨어는 끝까지 "미확인" |
+| ESP32 활용 | esp32.ino 는 `DATA:` 만 처리(실제로는 아무것도 안 보냄) | **ADD** `firmware/esp32_bridge` — UNO 줄 중계(USB) + (선택) Wi-Fi 로 거리 전송. 명령은 받지 않음 |
+| SENSOR_DISCONNECTED | 없음 | 카메라 PC 5초 무응답 → `disconnected`, 서버 `SensorStatus.DISCONNECTED` |
+| 기존 4센서·4서보 설정 | `firmware/esp32/` (MQTT 설계) | 시연에 **사용하지 않음** 명시. 삭제하지 않음. 서버 4칸은 4클래스 칸으로 유지, 센서 없는 3칸은 "수신 없음" |
+| Windows 배포 | — | 설정 화면(서버 IP·COM·카메라·모델), 첫 실행 검사, 로그 파일, `WINDOWS_DEPLOY.md` |
+| 추론 전용 | 기존도 학습 없음 | 모델 경로 우선순위, 손상 검사, CPU/GPU 자동·폴백, IMG_SIZE, GUI "INFERENCE ONLY" |

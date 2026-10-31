@@ -1690,6 +1690,62 @@
           }
         ]
       }
+    },
+    "/api/detections/{detection_id}/hardware": {
+      "post": {
+        "summary": "Post Hardware Status",
+        "description": "카메라 노트북 → 장치 ACK 결과 (completed / ack_timeout / rejected_busy …).",
+        "operationId": "post_hardware_status_api_detections__detection_id__hardware_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "detection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Detection Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HardwareStatusIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2193,6 +2249,16 @@
                 "type": "null"
               }
             ]
+          },
+          "latest_distance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2609,6 +2675,16 @@
               }
             ]
           },
+          "latest_distance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelemetryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "server_time": {
             "type": "string",
             "format": "date-time",
@@ -2727,6 +2803,74 @@
             "type": "boolean",
             "title": "Esp32 Connected",
             "default": false
+          },
+          "uno_firmware": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uno Firmware"
+          },
+          "servo_state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servo State"
+          },
+          "sensor_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 24
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sensor Status"
+          },
+          "distance_cm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Cm"
+          },
+          "fill_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Percent"
+          },
+          "sorted_ok": {
+            "type": "integer",
+            "title": "Sorted Ok",
+            "default": 0
+          },
+          "sorted_failed": {
+            "type": "integer",
+            "title": "Sorted Failed",
+            "default": 0
           },
           "upload_queue": {
             "type": "integer",
@@ -2881,6 +3025,74 @@
             "title": "Esp32 Connected",
             "default": false
           },
+          "uno_firmware": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uno Firmware"
+          },
+          "servo_state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servo State"
+          },
+          "sensor_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 24
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sensor Status"
+          },
+          "distance_cm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Cm"
+          },
+          "fill_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Percent"
+          },
+          "sorted_ok": {
+            "type": "integer",
+            "title": "Sorted Ok",
+            "default": 0
+          },
+          "sorted_failed": {
+            "type": "integer",
+            "title": "Sorted Failed",
+            "default": 0
+          },
           "upload_queue": {
             "type": "integer",
             "title": "Upload Queue",
@@ -3004,6 +3216,35 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HardwareStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "command_sent",
+          "completed",
+          "ack_timeout",
+          "rejected_busy",
+          "aborted",
+          "serial_failed",
+          "not_connected",
+          "disabled",
+          "skipped_busy"
+        ],
+        "title": "HardwareStatus",
+        "description": "카메라 노트북이 보고하는 시리얼 전송 결과 (EDGE_SERIAL 모드)."
+      },
+      "HardwareStatusIn": {
+        "properties": {
+          "hardware_status": {
+            "$ref": "#/components/schemas/HardwareStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hardware_status"
+        ],
+        "title": "HardwareStatusIn"
       },
       "HealthOut": {
         "properties": {

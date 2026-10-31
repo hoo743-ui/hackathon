@@ -6,13 +6,14 @@
 | 노트북 B (MacBook) | `./start_server.sh --mobile` | 중앙 서버(API·DB·이미지·WebSocket) + 관리자 웹 + Expo 개발 서버 |
 | 노트북 A (카메라) | `SMART_RECYCLE_AI.exe` (또는 `python smart_recycle_ai.py`) | 카메라·YOLO·Arduino 시리얼·센서·서버 전송 |
 | 스마트폰 | Expo Go → QR | 관리자 앱 |
-| Arduino UNO (+ESP32) | 전원/USB | 서보 3개·초음파 1개 (trush.ino) |
+| Arduino UNO + ESP32 | USB 2개 · 서보 전원 MB102 | UNO: 서보 3개·초음파 1개 (uno_controller) · ESP32: 중계(esp32_bridge) |
 
 ## 전날 준비 (한 번만)
 1. 맥북: `git checkout feature/smart-recycle-integration`, `.env` 확인 (`HARDWARE_MODE=EDGE_SERIAL`, `POSTGRES_DB`, `AI_API_TOKEN`)
 2. 맥북: 예전 `~/smart-recycling-system` 백엔드가 8000 포트를 쓰고 있으면 그 터미널에서 Ctrl+C (start_server.sh가 점유 여부를 알려 줌)
 3. 카메라 노트북: `edge/README.md` 대로 설치 → `best_model.pt` 복사 → `check_system.py` 전 항목 확인 → `build_exe.bat`
-4. Arduino에 `trush.ino` 업로드(이미 되어 있으면 생략), 서보 별도 5V 전원, GND 공통, D3→GPIO16 분압 확인
+4. Arduino IDE 로 UNO 에 **`firmware/uno_controller/uno_controller.ino`** 업로드 (ACK·거리 지원. 원본 trush.ino 도 동작은 하지만 성공 확인·적재율 불가), ESP32 에 `firmware/esp32_bridge/esp32_bridge.ino` 업로드 (Wi-Fi 전송을 쓰려면 `secrets.example.h` → `secrets.h`). 업로드 후 **시리얼 모니터 닫기**. 서보 3개는 MB102 5V, GND 공통, D3→GPIO16 분압 확인 (`HARDWARE_WIRING.md` 체크리스트)
+4-1. 빈 통에서 초음파 거리 실측 → 카메라 프로그램 설정의 "빈 통 거리", 센서가 달린 칸 → "초음파 센서 칸"
 5. 리허설: `docs/DEMO_END_TO_END_TEST.md` 표를 실제 장비로 채우기
 
 ## 당일 순서
@@ -21,14 +22,15 @@
 3. **웹**: 맥북 브라우저 `http://localhost:5173` (프로젝터) — 상단 "실시간 연결됨" 확인
 4. **폰**: Expo Go로 QR 스캔 → 홈 탭 "실시간 인식" 확인
 5. **카메라 노트북**: Wi-Fi 연결 → Arduino USB 연결 → `.env` 의 `BACKEND_URL` 이 맥북 IP인지 확인 → `SMART_RECYCLE_AI.exe`
-   - 연결 상태 7줄이 모두 초록(ESP32 모니터는 선택)인지 확인. 빨간 항목은 옆에 원인 표시
+   - 연결 상태(모델·추론·카메라·UNO·서보×3·HC-SR04·ESP32·서버)가 초록인지 확인. 빨간 항목은 옆에 원인 표시
    - 웹 개요 "카메라 노트북 · 센서" 에 `CAMERA_001 온라인`, 하드웨어 시리얼 초록
 6. **시연**: 쓰레기 1개를 카메라 앞에 0.5초 이상 → GUI에 종류·신뢰도·ID·하드웨어 결과 → 서보 동작 → 웹·폰 "실시간 인식" 에 같은 이미지·같은 ID
 7. 다음 물체는 이전 물체가 화면에서 빠지고 서보가 원위치(약 6초) 된 뒤에
 
 ## 말할 때 주의 (정직하게)
-- 하드웨어 결과는 "**명령 전송됨 (장치 응답 없음)**" 이다. Arduino 펌웨어에 ACK가 없어서 서버는 모터 동작을 확인할 수 없다 → "실제 동작은 눈으로 보시는 것처럼" 으로 설명.
-- 적재율 4칸은 센서가 1개뿐이라 "수신 없음"으로 나온다. 만차 알림(5cm 이내)만 실데이터.
+- uno_controller 펌웨어면 서보 순서가 끝난 뒤 `ACK:DONE` 을 받아 "**분류 성공 (장치 ACK 확인)**" 으로 바뀐다 (약 6초 뒤). 원본 trush.ino 면 응답이 없어 "명령 전송됨 · 동작 확인 불가" 로 남는다.
+- ACK 는 "펌웨어가 서보 동작 순서를 끝냈다"는 뜻이지, 쓰레기가 칸에 떨어졌는지를 센서로 확인한 것은 아니다.
+- 적재율은 센서가 달린 1칸만 실데이터, 나머지 3칸은 "수신 없음".
 
 ## 트러블슈팅 빠른 표
 | 증상 | 조치 |

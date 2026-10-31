@@ -56,6 +56,9 @@ const EDGE_DETAIL_LABELS: Record<string, string> = {
   SERIAL_NOT_CONNECTED: '시리얼 미연결',
   HARDWARE_DISABLED: '하드웨어 비활성',
   HARDWARE_BUSY: '이전 동작 중',
+  ACK_DONE: '장치 동작 완료 응답',
+  ACK_TIMEOUT: '장치 응답 시간 초과',
+  EMERGENCY_STOP: '비상 정지',
 };
 
 export function outcomeDetailLabel(detail: string | null | undefined): string | null {

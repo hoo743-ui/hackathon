@@ -2,7 +2,7 @@
 // 백엔드 스키마를 바꾸면 이 파일도 함께 수정한다.
 
 export type WasteType = 'plastic' | 'metal' | 'paper' | 'glass';
-export type SensorStatus = 'normal' | 'out_of_range' | 'timeout' | 'error';
+export type SensorStatus = 'normal' | 'out_of_range' | 'timeout' | 'error' | 'disconnected';
 export type ConnectionStatus = 'online' | 'offline' | 'unknown';
 export type OperatingMode = 'AUTO' | 'MANUAL';
 export type DataSource = 'hardware' | 'simulator';
@@ -95,6 +95,8 @@ export interface Dashboard {
   edges?: EdgeStatus[];
   /** 가장 최근 만차 알림 (초음파 1개, trush.ino) */
   latest_full_alert?: Telemetry | null;
+  /** HC-SR04 1개 최근 거리 이벤트 */
+  latest_distance?: Telemetry | null;
 }
 
 export interface BinStatistics {
@@ -240,7 +242,17 @@ export interface Detection {
   captured_at?: string;
 }
 
-export type HardwareStatus = 'pending' | 'command_sent' | 'serial_failed' | 'not_connected' | 'disabled' | 'skipped_busy';
+export type HardwareStatus =
+  | 'pending'
+  | 'command_sent'
+  | 'serial_failed'
+  | 'not_connected'
+  | 'disabled'
+  | 'skipped_busy'
+  | 'completed'
+  | 'ack_timeout'
+  | 'rejected_busy'
+  | 'aborted';
 
 export interface EdgeStatus {
   device_id: string;
@@ -255,6 +267,14 @@ export interface EdgeStatus {
   serial_port: string | null;
   esp32_port: string | null;
   esp32_connected: boolean;
+  /** uno_controller(ACK·거리) | legacy(trush.ino, 응답 없음) | unknown */
+  uno_firmware?: string | null;
+  servo_state?: string | null;
+  sensor_status?: string | null;
+  distance_cm?: number | null;
+  fill_percent?: number | null;
+  sorted_ok?: number;
+  sorted_failed?: number;
   upload_queue: number;
   uploads_ok: number;
   uploads_failed: number;

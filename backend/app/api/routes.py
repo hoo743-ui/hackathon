@@ -197,6 +197,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         hardware_mode=request.app.state.hardware.mode,
         edges=edge_service.edge_statuses(),
         latest_full_alert=await edge_service.latest_full_alert(session),
+        latest_distance=await edge_service.latest_distance(session),
     )
 
 

@@ -13,6 +13,7 @@ class SensorStatus(StrEnum):
     OUT_OF_RANGE = "out_of_range"
     TIMEOUT = "timeout"
     ERROR = "error"
+    DISCONNECTED = "disconnected"  # SENSOR_DISCONNECTED: 측정값이 일정 시간 오지 않음
 
 
 class ConnectionStatus(StrEnum):
@@ -74,7 +75,11 @@ class HardwareStatus(StrEnum):
     """카메라 노트북이 보고하는 시리얼 전송 결과 (EDGE_SERIAL 모드)."""
 
     PENDING = "pending"
-    COMMAND_SENT = "command_sent"  # 시리얼 write 성공. 실제 모터 동작은 장치 응답이 없어 확인 불가
+    COMMAND_SENT = "command_sent"  # 시리얼 write 성공. 실제 모터 동작은 아직(또는 ACK 없는 펌웨어라) 확인 안 됨
+    COMPLETED = "completed"  # uno_controller 펌웨어가 ACK:<c>:DONE 응답 → 서보 동작 순서 완료 확인
+    ACK_TIMEOUT = "ack_timeout"  # START/DONE 응답이 제한 시간 내에 없음
+    REJECTED_BUSY = "rejected_busy"  # 펌웨어가 ACK:<c>:BUSY 로 거부
+    ABORTED = "aborted"  # 비상 정지로 중단
     SERIAL_FAILED = "serial_failed"
     NOT_CONNECTED = "not_connected"
     DISABLED = "disabled"

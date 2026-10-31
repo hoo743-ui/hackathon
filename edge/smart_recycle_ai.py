@@ -19,7 +19,7 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 from types import SimpleNamespace
 
-from smartrecycle_edge.config import EDGE_DIR, settings
+from smartrecycle_edge.config import EDGE_DIR, resolve_model_path, settings
 
 LOG_DIR = EDGE_DIR / "logs"
 LOG_FILE = LOG_DIR / "smart_recycle_ai.log"
@@ -27,7 +27,11 @@ LOG_FILE = LOG_DIR / "smart_recycle_ai.log"
 OK, BAD, WARN, OFF = "#1f9d55", "#d64545", "#c58b00", "#8a8f98"
 WASTE_KO = {"glass": "유리", "metal": "금속", "paper": "종이", "plastic": "플라스틱"}
 HW_KO = {
-    "command_sent": ("명령 전송됨 (장치 응답 없음 · 동작 미확인)", WARN),
+    "completed": ("분류 성공 (장치 ACK:DONE 확인)", OK),
+    "ack_timeout": ("실패: 장치 응답 시간 초과", BAD),
+    "rejected_busy": ("실패: 장치가 동작 중이라 거부", BAD),
+    "aborted": ("중단: 비상 정지", BAD),
+    "command_sent": ("명령 전송됨 · 동작 확인 대기/불가", WARN),
     "not_connected": ("하드웨어 미연결 → 동작 안 함", BAD),
     "serial_failed": ("시리얼 전송 실패", BAD),
     "skipped_busy": ("이전 동작 중 → 생략", WARN),
@@ -97,9 +101,9 @@ class App:
         box.grid(row=0, column=0, sticky="ew")
         self.rows = {}
         for i, (key, label) in enumerate([
-            ("config", "설정 (.env)"), ("model", "YOLO 모델"), ("camera", "카메라"),
-            ("hw", "하드웨어 (Arduino 시리얼)"), ("esp32", "ESP32 USB (모니터)"), ("server", "맥북 서버"),
-            ("queue", "전송 대기"),
+            ("config", "설정 (.env)"), ("model", "YOLO 모델"), ("infer", "추론"), ("camera", "카메라"),
+            ("hw", "Arduino UNO"), ("servo", "서보모터 ×3"), ("sensor", "HC-SR04 ×1"),
+            ("esp32", "ESP32 DevKitC"), ("server", "맥북 서버"), ("queue", "전송 대기"),
         ]):
             ttk.Label(box, text=label, width=24).grid(row=i, column=0, sticky="w", pady=2)
             dot = tk.Label(box, text="●", fg=OFF, font=("Arial", 14))
@@ -123,10 +127,15 @@ class App:
         btns.grid(row=2, column=0, sticky="ew")
         for i, (t, cmd) in enumerate([
             ("연결 재확인", self.recheck), ("카메라 재시작", self.restart_camera),
-            ("서버 재시도", self.retry_server), ("로그 폴더", self.open_logs), ("안전 종료", self.quit),
+            ("서버 재시도", self.retry_server), ("설정", self.open_settings), ("로그", self.open_logs),
+            ("안전 종료", self.quit),
         ]):
             ttk.Button(btns, text=t, command=cmd).grid(row=0, column=i, padx=2, sticky="ew")
             btns.columnconfigure(i, weight=1)
+
+        estop = tk.Button(side, text="■ 비상 정지 (서보 대기 자세)", bg="#b3261e", fg="white", activebackground="#8c1d17",
+                          font=("Arial", 11, "bold"), command=self.estop)
+        estop.grid(row=4, column=0, sticky="ew", pady=(6, 0))
 
         logf = ttk.LabelFrame(side, text="이벤트 로그", padding=4)
         logf.grid(row=3, column=0, sticky="nsew", pady=(8, 0))
@@ -148,10 +157,31 @@ class App:
             self.phase = "failed"
             logging.getLogger("edge").error("시작 실패: %s", self.edge.status_msg)
 
+    def estop(self) -> None:
+        self.edge.emergency_stop()
+
+    def open_settings(self) -> None:
+        SettingsDialog(self.root, on_saved=self.restart_program)
+
+    def restart_program(self) -> None:
+        """설정 저장 후 프로그램 재시작 (포트·카메라·모델은 시작할 때 한 번만 연다)."""
+        self.edge.stop.set()
+        self.edge.restart_camera.set()
+        try:
+            self.edge.uploader.stop(drain_sec=1)
+            self.edge.hw.close()
+            if self.edge.esp32:
+                self.edge.esp32.close()
+        finally:
+            args = [sys.executable] + ([] if getattr(sys, "frozen", False) else [str(Path(__file__).resolve())])
+            os.execv(sys.executable, args)
+
     def recheck(self) -> None:
         hw = self.edge.hw
+        if self.edge.esp32:
+            self.edge.esp32.retry()
         if hw.enabled and hw.link and not hw.connected and hw.link.port:
-            threading.Thread(target=hw.link.open, daemon=True).start()
+            hw.link.retry()
         elif hw.enabled and hw.link and not hw.link.port:
             from smartrecycle_edge.serial_ports import resolve_hw_port
 
@@ -209,23 +239,48 @@ class App:
         probs = settings.problems()
         self._set("config", BAD if probs else OK, "; ".join(probs) or f"{settings.device_id} → {settings.backend_url}")
         if e.yolo:
-            self._set("model", OK, f"{Path(settings.model_path).name} · {len(e.yolo.names)} classes")
+            self._set("model", OK, f"{e.model_name} · 로드 완료 · {len(e.yolo.names)} classes")
+            self._set("infer", OK if e.yolo.camera_verified else WARN,
+                      f"INFERENCE ONLY · {e.yolo.device_label} · {e.fps:.1f} FPS · imgsz {e.yolo.imgsz} · conf {e.yolo.conf}"
+                      + ("" if e.yolo.camera_verified else " · 카메라 프레임 대기"))
         else:
             self._set("model", BAD if self.phase == "failed" else WARN, "로딩 중…" if self.phase == "starting" else e.status_msg)
+            self._set("infer", BAD if self.phase == "failed" else WARN, "모델 없음 → 추론 안 함" if self.phase == "failed" else "대기")
         cam_ok = e.camera_ok
         self._set("camera", OK if cam_ok else (WARN if self.phase == "starting" else BAD),
-                  f"CAMERA_INDEX={e.source} · {e.fps:.1f} fps" if cam_ok else e.status_msg)
+                  f"CAMERA_INDEX={e.source}" if cam_ok else e.status_msg)
         hw = e.hw
         if not hw.enabled:
             self._set("hw", OFF, "비활성 (HW_ENABLED=false)")
+            self._set("servo", OFF, "비활성")
         elif hw.connected:
-            self._set("hw", WARN if hw.busy else OK, f"{hw.port} @ {settings.hw_baud}" + (" · 동작 중" if hw.busy else ""))
+            fw = {"uno_controller": "uno_controller (ACK·거리 지원)", "legacy": "trush.ino (응답 없음 → 성공 확인 불가)",
+                  "unknown": "펌웨어 확인 중…"}[hw.firmware]
+            self._set("hw", OK if hw.firmware == "uno_controller" else WARN, f"{hw.port} @ {settings.hw_baud} · {fw}")
+            st = {"idle": ("대기", OK), "moving": ("동작 중", WARN), "unverified": ("명령 전송 · 동작 확인 불가", WARN),
+                  "error": ("오류 (응답 없음/거부)", BAD), "stopped": ("비상 정지됨", BAD)}.get(hw.servo_state, (hw.servo_state, OFF))
+            self._set("servo", st[1], f"{st[0]} · X(D9) 회전 · Y1(D10)/Y2(D11) 투하")
         else:
             self._set("hw", BAD, hw.last_error or f"{hw.port} 미연결")
-        if e.esp32:
-            self._set("esp32", OK if e.esp32.connected else BAD, e.esp32.port if e.esp32.connected else (e.esp32.last_error or "미연결"))
+            self._set("servo", BAD, "UNO 미연결 → 명령 안 보냄")
+        sn = e.sensor
+        sst = sn.status()
+        if sst == "unknown":
+            self._set("sensor", OFF if hw.firmware == "legacy" else WARN,
+                      "거리값 수신 없음" + (" (trush.ino 는 거리를 보내지 않음 → uno_controller 업로드 필요)" if hw.firmware == "legacy" else ""))
+        elif sst == "normal":
+            fill = sn.fill_percent()
+            self._set("sensor", OK, f"{sn.distance()} cm · 적재율 " + (f"{fill}%" if fill is not None else "— (EMPTY_DISTANCE_CM 미설정)")
+                      + (f" · {settings.sensor_bin_id}" if settings.sensor_bin_id else " · 칸 미지정"))
         else:
-            self._set("esp32", OFF, "사용 안 함 (ESP32_SERIAL_PORT 비어 있음)")
+            self._set("sensor", BAD, "SENSOR_DISCONNECTED" if sst == "disconnected" else "측정 오류 (범위 밖/응답 없음)")
+        if e.esp32:
+            i = e.esp32_info
+            self._set("esp32", OK if e.esp32.connected and i["uno_link"] == "OK" else (WARN if e.esp32.connected else BAD),
+                      (f"{e.esp32.port} · UNO 링크 {i['uno_link']} · Wi-Fi {i['wifi']} · HTTP {i['http']}") if e.esp32.connected
+                      else (e.esp32.last_error or "미연결"))
+        else:
+            self._set("esp32", OFF, "사용 안 함 (설정에서 ESP32 포트 지정)")
         st = e.uploader.stats
         self._set("server", OK if e.backend_online else BAD,
                   f"연결됨 · 성공 {st.ok} / 실패 {st.failed}" if e.backend_online else f"연결 안 됨 · {(st.last_error or settings.backend_url)[:120]}")
@@ -240,7 +295,8 @@ class App:
             t, c = HW_KO.get(d["hardware_status"], (d["hardware_status"], OFF))
             self.det_hw.config(text=f"하드웨어: {t}", fg=c)
         c = e.counts
-        self.counts.config(text=f"명령 전송 횟수 — 플라스틱 {c['L']} · 금속 {c['M']} · 유리 {c['G']} · 종이 {c['P']}")
+        self.counts.config(text=f"누적 인식 {sum(c.values())}건 (플라스틱 {c['L']} · 금속 {c['M']} · 유리 {c['G']} · 종이 {c['P']})\n"
+                                f"분류 성공(ACK) {e.sorted_ok} · 실패 {e.sorted_failed}")
 
         frame = e.latest_frame
         if frame is not None:
@@ -269,11 +325,118 @@ class App:
         self.video.config(image=self.photo, text="")
 
 
+class SettingsDialog:
+    """Windows 현장 설정: 서버 IP · COM 포트(자동/수동) · 카메라 · 모델 경로 · 센서. 저장 → .env → 재시작."""
+
+    FIELDS = [
+        ("BACKEND_URL", "맥북 서버 주소 (http://<맥북 LAN IP>:8000)"),
+        ("AI_API_TOKEN", "AI_API_TOKEN (맥북 .env 와 동일)"),
+        ("CAMERA_INDEX", "카메라 번호"),
+        ("HW_SERIAL_PORT", "Arduino UNO 포트 (auto 또는 COMx)"),
+        ("ESP32_SERIAL_PORT", "ESP32 포트 (비우면 사용 안 함)"),
+        ("MODEL_PATH", "모델 경로 (best_model.pt)"),
+        ("SENSOR_BIN_ID", "초음파 센서 칸 (BIN_001~004)"),
+        ("EMPTY_DISTANCE_CM", "빈 통 거리 cm (실측)"),
+    ]
+
+    def __init__(self, root, on_saved, reason: str = ""):
+        from smartrecycle_edge.serial_ports import list_serial_ports
+
+        self.on_saved = on_saved
+        self.win = tk.Toplevel(root)
+        self.win.title("SMART RECYCLE 설정")
+        self.win.grab_set()
+        f = ttk.Frame(self.win, padding=12)
+        f.pack(fill="both", expand=True)
+        if reason:
+            ttk.Label(f, text=reason, foreground=BAD, wraplength=520).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
+        ports = ["auto", ""] + [p.device for p in list_serial_ports()]
+        current = {
+            "BACKEND_URL": settings.backend_url, "AI_API_TOKEN": settings.ai_api_token, "CAMERA_INDEX": settings.camera_index,
+            "HW_SERIAL_PORT": settings.hw_serial_port, "ESP32_SERIAL_PORT": settings.esp32_serial_port,
+            "MODEL_PATH": settings.model_path, "SENSOR_BIN_ID": settings.sensor_bin_id,
+            "EMPTY_DISTANCE_CM": str(settings.empty_distance_cm or ""),
+        }
+        self.vars: dict[str, tk.StringVar] = {}
+        for i, (key, label) in enumerate(self.FIELDS, start=1):
+            ttk.Label(f, text=label).grid(row=i, column=0, sticky="w", pady=3)
+            v = tk.StringVar(value=current[key])
+            self.vars[key] = v
+            if key in ("HW_SERIAL_PORT", "ESP32_SERIAL_PORT"):
+                w = ttk.Combobox(f, textvariable=v, values=ports, width=40)
+            elif key == "CAMERA_INDEX":
+                w = ttk.Combobox(f, textvariable=v, values=[str(n) for n in range(6)], width=40)
+            elif key == "SENSOR_BIN_ID":
+                w = ttk.Combobox(f, textvariable=v, values=["", "BIN_001", "BIN_002", "BIN_003", "BIN_004"], width=40)
+            else:
+                w = ttk.Entry(f, textvariable=v, width=42, show="•" if key == "AI_API_TOKEN" else "")
+            w.grid(row=i, column=1, sticky="ew", pady=3)
+            if key == "MODEL_PATH":
+                ttk.Button(f, text="찾기…", command=self.browse).grid(row=i, column=2, padx=4)
+            if key == "CAMERA_INDEX":
+                ttk.Button(f, text="탐색", command=self.scan_cameras).grid(row=i, column=2, padx=4)
+        self.note = ttk.Label(f, text="COM 포트: 장치 관리자 › 포트(COM & LPT). 저장하면 프로그램이 다시 시작됩니다.", wraplength=520)
+        self.note.grid(row=20, column=0, columnspan=3, sticky="w", pady=(8, 4))
+        b = ttk.Frame(f)
+        b.grid(row=21, column=0, columnspan=3, sticky="e")
+        ttk.Button(b, text="취소", command=self.win.destroy).pack(side="right", padx=4)
+        ttk.Button(b, text="저장 후 재시작", command=self.save).pack(side="right")
+
+    def browse(self) -> None:
+        from tkinter import filedialog
+
+        path = filedialog.askopenfilename(title="best_model.pt 선택", filetypes=[("YOLO 모델", "*.pt"), ("모든 파일", "*.*")])
+        if path:
+            self.vars["MODEL_PATH"].set(path)
+
+    def scan_cameras(self) -> None:
+        import cv2
+
+        found = []
+        for i in range(6):
+            cap = cv2.VideoCapture(i, cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_ANY)
+            ok = cap.isOpened() and cap.read()[0]
+            cap.release()
+            if ok:
+                found.append(str(i))
+        self.note.config(text=f"사용 가능한 카메라: {', '.join(found) or '없음'} (실행 중인 프로그램이 쓰는 카메라는 목록에 안 나올 수 있음)")
+
+    def save(self) -> None:
+        from smartrecycle_edge.config import save_env
+
+        values = {k: v.get().strip() for k, v in self.vars.items()}
+        url = values["BACKEND_URL"]
+        if not url.startswith("http://") or "localhost" in url or "127.0.0.1" in url:
+            messagebox.showerror("설정", "서버 주소는 http://<맥북 LAN IP>:8000 형식이어야 합니다 (localhost 금지).", parent=self.win)
+            return
+        if values["EMPTY_DISTANCE_CM"]:
+            try:
+                float(values["EMPTY_DISTANCE_CM"])
+            except ValueError:
+                messagebox.showerror("설정", "빈 통 거리는 숫자(cm)여야 합니다.", parent=self.win)
+                return
+        save_env(values)
+        logging.getLogger("edge").info("설정 저장: %s", {k: ("***" if k == "AI_API_TOKEN" else v) for k, v in values.items()})
+        self.win.destroy()
+        self.on_saved()
+
+
+def first_run_problems() -> list[str]:
+    probs = list(settings.problems())
+    if resolve_model_path(settings.model_path) is None:
+        probs.append(f"best_model.pt 를 찾을 수 없음 (MODEL_PATH={settings.model_path}, {EDGE_DIR / 'models' / 'best_model.pt'})")
+    return probs
+
+
 def main() -> None:
     setup_logging()
     root = tk.Tk()
     try:
-        App(root)
+        app = App(root)
+        probs = first_run_problems()
+        if probs:  # 최초 실행/설정 누락 → 설정 화면부터
+            root.after(300, lambda: SettingsDialog(root, on_saved=app.restart_program,
+                                                   reason="필수 설정을 확인하세요:\n- " + "\n- ".join(probs)))
     except Exception as exc:  # 시작 단계 오류를 창으로 보여준다
         logging.exception("시작 오류")
         messagebox.showerror("SMART RECYCLE AI", f"시작 오류: {exc}\n로그: {LOG_FILE}")

@@ -24,7 +24,7 @@ PERMANENT = {400, 401, 403, 404, 413, 415, 422}  # 재시도해도 같은 결과
 
 @dataclass
 class Job:
-    kind: str  # detection | telemetry
+    kind: str  # detection | telemetry | hardware
     payload: dict
     image: bytes | None = None
     attempts: int = 0
@@ -86,6 +86,10 @@ class Uploader:
     def submit_telemetry(self, payload: dict) -> None:
         self._put(Job("telemetry", payload))
 
+    def submit_hw_update(self, detection_id: str, status: str) -> None:
+        """장치 ACK 결과 → POST /api/detections/{id}/hardware (분류 전송 뒤 같은 큐 순서로 보낸다)."""
+        self._put(Job("hardware", {"detection_id": detection_id, "hardware_status": status}))
+
     def flush_outbox(self) -> int:
         """서버 복구 시 outbox 를 다시 큐에 넣는다 (오래된 순, 큐 여유만큼)."""
         n = 0
@@ -123,6 +127,15 @@ class Uploader:
         (self.outbox / f"{did}.jpg").write_bytes(job.image or b"")
         (self.outbox / f"{did}.json").write_text(json.dumps(job.payload, ensure_ascii=False), encoding="utf-8")
 
+    def _patch_outbox(self, job: Job) -> bool:
+        f = self.outbox / f"{job.payload['detection_id']}.json"
+        if not f.exists():
+            return False
+        meta = json.loads(f.read_text(encoding="utf-8"))
+        meta["hardware_status"] = job.payload["hardware_status"]
+        f.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+        return True
+
     def _remove_outbox(self, job: Job) -> None:
         if job.from_outbox:
             job.from_outbox.unlink(missing_ok=True)
@@ -133,6 +146,9 @@ class Uploader:
             files = {"image": (f"{job.payload['detection_id']}.jpg", job.image, "image/jpeg")}
             data = {"metadata": json.dumps(job.payload, ensure_ascii=False)}
             return self.session.post(f"{self.base}/api/detections", data=data, files=files, timeout=self.timeout)
+        if job.kind == "hardware":
+            return self.session.post(f"{self.base}/api/detections/{job.payload['detection_id']}/hardware",
+                                     json={"hardware_status": job.payload["hardware_status"]}, timeout=self.timeout)
         return self.session.post(f"{self.base}/api/telemetry", json=job.payload, timeout=self.timeout)
 
     def _run(self) -> None:
@@ -168,7 +184,9 @@ class Uploader:
             self.stats.last_error = f"HTTP {status}: {err}" if status else err
             if status is None:
                 self.stats.backend_online = False
-            if status in PERMANENT:
+            if job.kind == "hardware" and self._patch_outbox(job):
+                continue  # 분류가 아직 outbox 에 있음 → 그 파일의 hardware_status 를 고쳐 함께 보낸다
+            if status in PERMANENT and not (job.kind == "hardware" and status == 404):
                 self.stats.failed += 1
                 log.error("전송 거부(재시도 안 함) %s: %s", job.kind, self.stats.last_error)
                 self._remove_outbox(job)

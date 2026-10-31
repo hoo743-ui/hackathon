@@ -8,6 +8,10 @@ import { EmptyState, StatusText } from './primitives';
 import type { Tone } from './primitives';
 
 const HW_TONE: Record<string, Tone> = {
+  completed: 'ok',
+  ack_timeout: 'critical',
+  rejected_busy: 'warning',
+  aborted: 'critical',
   command_sent: 'attention',
   pending: 'accent',
   serial_failed: 'critical',
@@ -114,6 +118,14 @@ export function DetectionStrip({ items, limit = 6 }: { items: Detection[]; limit
   );
 }
 
+const SERVO_LABEL: Record<string, string> = {
+  idle: '대기',
+  moving: '동작 중',
+  unverified: '전송 · 확인 불가',
+  error: '응답 없음/오류',
+  stopped: '비상 정지',
+};
+
 function Flag({ ok, label, detail, off }: { ok: boolean; label: string; detail?: string | null; off?: boolean }) {
   return (
     <li>
@@ -143,8 +155,28 @@ export function EdgeStatusPanel({ edges, fullAlert, now }: { edges: EdgeStatus[]
             <Flag
               ok={e.online && e.serial_connected}
               off={!e.serial_enabled}
-              label={e.serial_enabled ? '하드웨어 시리얼' : '하드웨어 비활성'}
-              detail={e.serial_port}
+              label={e.serial_enabled ? 'Arduino UNO' : '하드웨어 비활성'}
+              detail={[e.serial_port, e.uno_firmware === 'legacy' ? 'trush.ino · 응답 없음' : e.uno_firmware].filter(Boolean).join(' · ') || null}
+            />
+            <Flag
+              ok={e.online && e.serial_connected && (e.servo_state === 'idle' || e.servo_state === 'moving')}
+              off={!e.serial_enabled}
+              label="서보 ×3 (X·Y1·Y2)"
+              detail={`${SERVO_LABEL[e.servo_state ?? ''] ?? '--'} · 성공 ${e.sorted_ok ?? 0} · 실패 ${e.sorted_failed ?? 0}`}
+            />
+            <Flag
+              ok={e.online && e.sensor_status === 'normal'}
+              off={!e.sensor_status || e.sensor_status === 'unknown'}
+              label="HC-SR04 ×1"
+              detail={
+                e.sensor_status === 'normal'
+                  ? `${e.distance_cm ?? '--'} cm · 적재율 ${e.fill_percent != null ? `${e.fill_percent}%` : '--'}`
+                  : e.sensor_status === 'disconnected'
+                    ? 'SENSOR_DISCONNECTED'
+                    : e.sensor_status === 'error'
+                      ? '측정 오류'
+                      : '수신 없음'
+              }
             />
             {e.esp32_port && <Flag ok={e.online && e.esp32_connected} label="ESP32 USB" detail={e.esp32_port} />}
             <Flag ok={e.upload_queue === 0} label={`전송 대기 ${e.upload_queue}건`} detail={`성공 ${e.uploads_ok} · 실패 ${e.uploads_failed}`} />

@@ -12,6 +12,7 @@ export const SENSOR_STATUS_LABELS: Record<SensorStatus, string> = {
   out_of_range: '측정 범위 이탈',
   timeout: '응답 없음',
   error: '센서 오류',
+  disconnected: '센서 연결 끊김',
 };
 
 export const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
@@ -83,7 +84,11 @@ export const DETECTION_OUTCOME_LABELS: Record<string, string> = {
 /** 카메라 노트북 → 아두이노 시리얼 결과. 아두이노는 ACK를 보내지 않으므로 '완료'라고 표시하지 않는다. */
 export const HARDWARE_STATUS_LABELS: Record<string, string> = {
   pending: '대기',
-  command_sent: '명령 전송됨 (장치 응답 없음)',
+  command_sent: '명령 전송됨 · 동작 확인 전',
+  completed: '분류 성공 (장치 ACK 확인)',
+  ack_timeout: '실패 · 장치 응답 없음',
+  rejected_busy: '실패 · 장치 동작 중',
+  aborted: '중단 · 비상 정지',
   serial_failed: '시리얼 전송 실패',
   not_connected: '하드웨어 미연결',
   disabled: '하드웨어 비활성',

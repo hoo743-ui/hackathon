@@ -38,7 +38,25 @@ EDGE_OUTCOME: dict[str, tuple[str, str | None]] = {
     HardwareStatus.NOT_CONNECTED: (DetectionOutcome.DEVICE_UNAVAILABLE, "SERIAL_NOT_CONNECTED"),
     HardwareStatus.DISABLED: (DetectionOutcome.NO_HARDWARE, "HARDWARE_DISABLED"),
     HardwareStatus.SKIPPED_BUSY: (DetectionOutcome.DEVICE_UNAVAILABLE, "HARDWARE_BUSY"),
+    HardwareStatus.COMPLETED: (DetectionOutcome.SORTED, "ACK_DONE"),
+    HardwareStatus.ACK_TIMEOUT: (DetectionOutcome.SORT_FAILED, "ACK_TIMEOUT"),
+    HardwareStatus.REJECTED_BUSY: (DetectionOutcome.DEVICE_UNAVAILABLE, "HARDWARE_BUSY"),
+    HardwareStatus.ABORTED: (DetectionOutcome.SORT_FAILED, "EMERGENCY_STOP"),
 }
+
+
+async def update_hardware_status(session: AsyncSession, detection_id, status: HardwareStatus) -> DetectionLog:
+    """카메라 노트북이 장치 ACK(또는 타임아웃)를 받은 뒤 결과를 갱신한다 (EDGE_SERIAL)."""
+    det = await session.scalar(select(DetectionLog).where(DetectionLog.detection_id == detection_id))
+    if det is None:
+        raise APIError(404, "DETECTION_NOT_FOUND", "detection not found")
+    det.hardware_status = status
+    if det.outcome != DetectionOutcome.UNRECOGNIZED:
+        det.outcome, det.outcome_detail = EDGE_OUTCOME[status]
+    await session.commit()
+    await session.refresh(det)
+    await broadcast_detection(det)
+    return det
 
 
 async def ingest(

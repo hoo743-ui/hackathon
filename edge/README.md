@@ -5,7 +5,7 @@
 
 | 파일 | 역할 |
 |---|---|
-| `smart_recycle_ai.py` | **통합 GUI** (영상 · 연결 상태 · 최근 분류 · 하드웨어 결과 · 로그 · 재확인/카메라 재시작/서버 재시도/안전 종료). EXE 진입점 |
+| `smart_recycle_ai.py` | **통합 GUI** — 영상 · 모델/추론(INFERENCE ONLY·CPU/GPU·FPS) · 카메라 · UNO · 서보×3 · HC-SR04(거리·적재율) · ESP32 · 서버 · 최근 분류(성공/실패) · 로그 · 설정(서버 IP·COM·카메라·모델) · 비상 정지. EXE 진입점 |
 | `start_camera_system.py` | 같은 기능의 CLI 버전 (OpenCV 창). `--source 이미지`, `--no-hw`, `--headless` |
 | `check_system.py` | 사전 점검: 패키지 · 모델/클래스 매핑 · 카메라 · 시리얼 포트 · 백엔드 · 업로드 (PASS/FAIL/NOT TESTED) |
 | `smartrecycle_edge/` | config · detector(안정 검출) · hardware(시리얼 단독 소유) · uploader(재시도·outbox) · serial_ports |
@@ -34,10 +34,14 @@ Windows EXE는 Windows에서만 빌드된다 (PyInstaller는 교차 빌드 불�
 ## 분류 1회 판정
 같은 클래스가 `STABLE_FRAMES`(4)프레임 + `STABLE_MIN_SEC`(0.4초) 연속 → 1회 처리 → 물체가 `CLEAR_SEC`(1초) 동안 사라지거나 다른 물체로 바뀌기 전까지 잠금, 처리 간격 최소 `SEND_COOLDOWN`(2초), 모터 동작 중(`HW_BUSY_SEC` 6.5초)에는 새 처리 안 함.
 
+Windows 배포: **[WINDOWS_DEPLOY.md](WINDOWS_DEPLOY.md)**
+
 ## 하드웨어 결과 표시
 | 값 | 의미 |
 |---|---|
-| `command_sent` | 시리얼로 명령 전송 성공. **Arduino가 응답하지 않으므로 동작 완료가 아님** |
+| `completed` | **분류 성공** — uno_controller 가 `ACK:<c>:DONE` 응답 (서버 outcome `SORTED`) |
+| `ack_timeout` / `rejected_busy` / `aborted` | 실패 — 응답 없음 / 장치 동작 중 거부 / 비상 정지 |
+| `command_sent` | 명령 전송됨. uno_controller 면 ACK 대기 중, **trush.ino(구 펌웨어)면 응답이 없어 끝까지 미확인** |
 | `not_connected` | 포트 미연결 → 모터 명령 없음 |
 | `serial_failed` | 쓰기 실패 (케이블 분리 등) |
 | `skipped_busy` | 직전 동작 중 → 생략 |

@@ -51,11 +51,14 @@ def test_hw_blocked_while_busy():
 
 def test_hardware_controller_sends_single_char_and_busy():
     lines = []
-    hw = HardwareController(True, "loop://", 9600, busy_sec=0.5, on_line=lambda w, l: lines.append(l))
+    hw = HardwareController(True, "loop://", 9600, busy_sec=0.5, on_line=lambda w, l: lines.append(l), hello_wait=0.1)
     hw.link.reset_wait = 0
     hw.start()
     assert hw.connected
-    assert hw.send("L") == "command_sent"
+    time.sleep(0.3)
+    hw.tick()
+    assert hw.firmware == "legacy"  # loop:// 는 '?' 를 되돌려 줄 뿐 HELLO 가 없음
+    assert hw.send("L") == "command_sent" and hw.servo_state == "unverified"
     assert hw.send("G") == "skipped_busy"  # 모터 동작 중에는 보내지 않음
     time.sleep(0.6)
     assert hw.send("G") == "command_sent"
@@ -69,7 +72,7 @@ def test_loop_echo_no_count_messages():
     hw = HardwareController(True, "loop://", 9600, busy_sec=0, on_line=lambda *_: None)
     hw.link = link
     assert hw.send("P") == "command_sent"
-    assert link._ser.read(10) == b"P"
+    assert link._ser.read(10) == b"P\n"  # 한 글자 + 개행 (uno_controller 는 한 글자 줄만 명령으로 처리)
     link.close()
 
 

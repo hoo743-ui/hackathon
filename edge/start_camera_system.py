@@ -23,12 +23,12 @@ from pathlib import Path
 import cv2
 import requests
 
-from smartrecycle_edge.config import EDGE_DIR, settings
-from smartrecycle_edge.detector import StableTrigger, YoloRunner, top_detection
-from smartrecycle_edge.hardware import LEGACY_ID_TO_SIGNAL, NAME_TO_SIGNAL, HardwareController, SerialLink
+from smartrecycle_edge.config import EDGE_DIR, resolve_model_path, settings
+from smartrecycle_edge.detector import ModelLoadError, StableTrigger, YoloRunner, top_detection
+from smartrecycle_edge.hardware import LEGACY_ID_TO_SIGNAL, NAME_TO_SIGNAL, HardwareController, SensorMonitor, SerialLink
 from smartrecycle_edge.uploader import Uploader
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 log = logging.getLogger("edge")
 
 
@@ -79,7 +79,7 @@ class Heartbeat(threading.Thread):
                 "camera_ok": a.camera_ok,
                 "camera_index": a.source,
                 "model_loaded": a.yolo is not None,
-                "model_name": Path(settings.model_path).name,
+                "model_name": a.model_name,
                 "model_classes": {str(k): v for k, v in (a.yolo.names.items() if a.yolo else [])},
                 "fps": round(a.fps, 1),
                 "serial_enabled": a.hw.enabled,
@@ -87,6 +87,13 @@ class Heartbeat(threading.Thread):
                 "serial_port": a.hw.port,
                 "esp32_port": settings.esp32_serial_port or None,
                 "esp32_connected": bool(a.esp32 and a.esp32.connected),
+                "uno_firmware": a.hw.firmware if a.hw.connected else None,
+                "servo_state": a.hw.servo_state if a.hw.connected else None,
+                "sensor_status": a.sensor.status(),
+                "distance_cm": a.sensor.distance(),
+                "fill_percent": a.sensor.fill_percent(),
+                "sorted_ok": a.sorted_ok,
+                "sorted_failed": a.sorted_failed,
                 "upload_queue": a.uploader.pending,
                 "uploads_ok": a.uploader.stats.ok,
                 "uploads_failed": a.uploader.stats.failed,
@@ -119,7 +126,11 @@ class EdgeApp:
         self.backend_online = False
         self.fps = 0.0
         self.yolo: YoloRunner | None = None
-        self.counts = {"G": 0, "M": 0, "P": 0, "L": 0}
+        self.counts = {"G": 0, "M": 0, "P": 0, "L": 0}  # 인식(분류 처리) 건수
+        self.sorted_ok = 0  # 장치 ACK DONE 확인
+        self.sorted_failed = 0  # ACK 타임아웃/거부/중단/전송 실패
+        self.model_name = Path(settings.model_path).name
+        self.model_path: Path | None = None
         self.last_event = ""
         self.last_detection: dict | None = None  # GUI 표시용
         self.latest_frame = None  # GUI 표시용 (annotated)
@@ -130,7 +141,12 @@ class EdgeApp:
                                  settings.upload_max_attempts, settings.outbox_dir, settings.outbox_max_files)
         hw_enabled = settings.hw_enabled and not args.no_hw
         self.hw = HardwareController(hw_enabled, settings.hw_serial_port, settings.hw_baud, settings.hw_busy_sec,
-                                     self.on_serial_line, exclude_ports={settings.esp32_serial_port})
+                                     self.on_serial_line, exclude_ports={settings.esp32_serial_port},
+                                     ack_timeout=settings.ack_timeout, on_result=self.on_hw_result)
+        self.sensor = SensorMonitor(settings.empty_distance_cm, timeout_sec=settings.sensor_timeout_sec)
+        self._sensor_sent_at = 0.0
+        self._sensor_sent_status = ""
+        self.esp32_info = {"wifi": "-", "uno_link": "-", "http": "-"}
         self.esp32: SerialLink | None = None
         if settings.esp32_serial_port and not args.no_hw:
             # ESP32 USB 로그 모니터 (읽기 전용). ESP32는 명령을 받지 않는다 (esp32.ino 기준)
@@ -139,33 +155,103 @@ class EdgeApp:
         self.trigger = StableTrigger(settings.stable_frames, settings.stable_min_sec, settings.clear_sec,
                                      settings.send_cooldown)
         self.heartbeat = Heartbeat(self)
+        self.housekeeper = threading.Thread(target=self._housekeeping, name="housekeeping", daemon=True)
 
-    # --- 시리얼 수신 → 센서 이벤트 ---
-    def on_serial_line(self, who: str, line: str) -> None:
-        log.info("[%s] %s", who, line)
-        kind, sensor = "serial_line", None
-        if "[ALERT]" in line or line.startswith("FULL:"):
-            kind, sensor = "bin_full_alert", (line.split(":", 1)[1] if line.startswith("FULL:") else "TRASH")
-        elif who == "esp32" and "WiFi" not in line and "전송" not in line:
-            return  # ESP32 부팅 로그 등은 서버로 보내지 않음
+    # --- 주기 작업: ACK 타임아웃, 센서 끊김 감지·전송 ---
+    def _housekeeping(self) -> None:
+        while not self.stop.wait(0.5):
+            try:
+                self.hw.tick()
+                self._maybe_send_sensor()
+            except Exception:
+                log.exception("housekeeping error")
+
+    def _maybe_send_sensor(self, force: bool = False) -> None:
+        st = self.sensor.status()
+        if st == "unknown" or not settings.forward_sensor:
+            return
+        now = time.monotonic()
+        if not force and st == self._sensor_sent_status and now - self._sensor_sent_at < settings.sensor_send_sec:
+            return
+        if st != self._sensor_sent_status:
+            log.info("[HC-SR04] 상태 %s → %s", self._sensor_sent_status or "-", st.upper() if st != "disconnected" else "SENSOR_DISCONNECTED")
+        self._sensor_sent_at, self._sensor_sent_status = now, st
         self.uploader.submit_telemetry({
             "device_id": settings.device_id,
-            "kind": kind,
-            "sensor_id": sensor,
-            "raw": line[:1000],
-            "payload": {"port": who},
+            "kind": "distance",
+            "sensor_id": "HC-SR04",
+            "raw": f"DIST:{self.sensor.last_raw}" if self.sensor.last_raw is not None else None,
+            "payload": {
+                "distance_cm": self.sensor.distance(),
+                "sensor_status": st,
+                "bin_id": settings.sensor_bin_id or None,
+                "empty_distance_cm": settings.empty_distance_cm or None,
+                "fill_percent_edge": self.sensor.fill_percent(),
+                "filter": "median5",
+            },
             "source": "hardware",
             "measured_at": datetime.now(timezone.utc).isoformat(),
         })
 
+    # --- 장치 ACK 결과 ---
+    def on_hw_result(self, detection_id: str, signal_char: str, status: str) -> None:
+        if status == "completed":
+            self.sorted_ok += 1
+        else:
+            self.sorted_failed += 1
+        if self.last_detection and self.last_detection.get("detection_id") == detection_id:
+            self.last_detection["hardware_status"] = status
+        self.uploader.submit_hw_update(detection_id, status)
+
+    def emergency_stop(self) -> None:
+        log.warning("비상 정지 요청 → 'S' 전송")
+        ok = self.hw.emergency_stop()
+        if not ok:
+            log.error("비상 정지 명령을 보내지 못함 (시리얼 미연결) — 장치 전원을 차단하세요")
+        elif not self.hw.ack_capable:
+            log.warning("구 펌웨어(trush.ino)는 'S' 를 처리하지 않습니다 — 필요하면 서보 전원을 차단하세요")
+
+    # --- 시리얼 수신 → 센서 이벤트 ---
+    def on_serial_line(self, who: str, line: str) -> None:
+        if line.startswith("DIST:"):  # 1초마다 → 로그에는 남기지 않음
+            self.sensor.feed(line[5:])
+            self._maybe_send_sensor()
+            return
+        if who == "esp32":
+            if line.startswith("UNO>"):
+                inner = line[4:]
+                self.esp32_info["uno_link"] = "OK"
+                if inner.startswith("DIST:") and not self.hw.connected:
+                    self.sensor.feed(inner[5:])  # UNO USB 가 없을 때 ESP32 경유 값 사용
+                    self._maybe_send_sensor()
+                return
+            if line.startswith("ESP32:WIFI:"):
+                self.esp32_info["wifi"] = line.split(":", 2)[2]
+            elif line.startswith("ESP32:UNO_LINK:"):
+                self.esp32_info["uno_link"] = line.rsplit(":", 1)[1]
+                return
+            elif line.startswith("ESP32:HTTP:"):
+                self.esp32_info["http"] = line.rsplit(":", 1)[1]
+                return
+        log.info("[%s] %s", who, line)
+        if "[ALERT]" in line or line.startswith("FULL:"):  # trush.ino (구 펌웨어)
+            self.uploader.submit_telemetry({
+                "device_id": settings.device_id, "kind": "bin_full_alert",
+                "sensor_id": line.split(":", 1)[1] if line.startswith("FULL:") else "TRASH",
+                "raw": line[:1000], "payload": {"port": who}, "source": "hardware",
+                "measured_at": datetime.now(timezone.utc).isoformat(),
+            })
+
     # --- 분류 1회 처리 ---
     def handle(self, det, annotated) -> None:
         signal_char = self.signal_map.get(det.class_id)
-        # ① 하드웨어 먼저 (네트워크와 독립)
-        hw_status = self.hw.send(signal_char)
-        if signal_char and hw_status == "command_sent":
-            self.counts[signal_char] += 1
         detection_id = str(uuid.uuid4())
+        # ① 하드웨어 먼저 (네트워크와 독립). 성공 여부는 ACK 로 나중에 갱신
+        hw_status = self.hw.send(signal_char, detection_id)
+        if signal_char:
+            self.counts[signal_char] += 1
+        if hw_status in ("serial_failed", "not_connected", "skipped_busy") and signal_char and self.hw.enabled:
+            self.sorted_failed += 1
         ok, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, settings.jpeg_quality])
         if not ok:
             log.error("JPEG 인코딩 실패 → 전송 생략")
@@ -176,7 +262,7 @@ class EdgeApp:
             "waste_type": det.name.strip().lower(),
             "class_id": det.class_id,
             "confidence": round(det.confidence, 4),
-            "model_name": Path(settings.model_path).name,
+            "model_name": self.model_name,
             "captured_at": datetime.now(timezone.utc).isoformat(),
             "bounding_box": dict(zip(("x1", "y1", "x2", "y2"), (round(v, 1) for v in det.box))),
             "hardware_status": hw_status,
@@ -211,19 +297,26 @@ class EdgeApp:
         if settings.problems():
             self.status_msg = "설정 오류: " + "; ".join(settings.problems())
             return 2
-        model_path = Path(settings.model_path)
-        if not model_path.is_absolute():
-            model_path = (EDGE_DIR / model_path) if (EDGE_DIR / model_path).exists() else model_path
-        if not model_path.exists():
-            log.error("모델 파일이 없습니다: %s (MODEL_PATH 확인)", model_path)
-            self.status_msg = f"모델 파일 없음: {model_path}"
+        model_path = resolve_model_path(settings.model_path)
+        if model_path is None:
+            log.error("모델 파일을 찾을 수 없습니다: MODEL_PATH=%s, %s", settings.model_path, EDGE_DIR / "models" / "best_model.pt")
+            self.status_msg = "모델 파일 없음 — 설정에서 best_model.pt 경로를 지정하세요"
             return 2
-        log.info("YOLO 모델 로드: %s", model_path)
-        probe = YoloRunner(str(model_path), settings.confidence_threshold)
-        self.signal_map = build_signal_map(probe.names)
-        probe.target_ids = sorted(self.signal_map) or None
+        self.model_path, self.model_name = model_path, model_path.name
+        log.info("YOLO 모델 로드 (INFERENCE ONLY): %s", model_path)
+        try:
+            probe = YoloRunner(str(model_path), settings.confidence_threshold, device=settings.yolo_device,
+                               imgsz=settings.img_size)
+            self.signal_map = build_signal_map(probe.names)
+            probe.target_ids = sorted(self.signal_map) or None
+            probe.warmup()
+        except ModelLoadError as exc:
+            log.error("%s", exc)
+            self.status_msg = str(exc)[:200]
+            return 2
         self.yolo = probe
-        log.info("모델 클래스: %s · 대상 class id: %s", probe.names, probe.target_ids)
+        log.info("모델 클래스: %s · 대상 class id: %s · 추론 장치: %s · imgsz=%d · conf=%.2f",
+                 probe.names, probe.target_ids, probe.device_label, probe.imgsz, probe.conf)
 
         self.cap, self.still = open_camera(self.source)
         if self.still:
@@ -236,7 +329,9 @@ class EdgeApp:
             log.error("카메라를 열 수 없습니다 (CAMERA_INDEX=%s). check_system.py --cameras 로 번호 확인", self.source)
             self.status_msg = f"카메라를 열 수 없음 (CAMERA_INDEX={self.source})"
             # 하드웨어·서버 상태는 계속 보고한다
-            self.uploader.start(); self.hw.start(); self.heartbeat.start()
+            self.uploader.start(); self.hw.start(); self.heartbeat.start(); self.housekeeper.start()
+            if self.esp32:
+                self.esp32.start()
             return 3
 
         self.uploader.start()
@@ -244,6 +339,7 @@ class EdgeApp:
         if self.esp32:
             self.esp32.start()
         self.heartbeat.start()
+        self.housekeeper.start()
         log.info("시작: device=%s backend=%s", settings.device_id, settings.backend_url)
         self.status_msg = "카메라 모드"
         return 0
@@ -302,6 +398,9 @@ class EdgeApp:
                 try:
                     result = self.yolo(frame)
                     infer_errors = 0
+                    if not self.yolo.camera_verified:
+                        self.yolo.camera_verified = True
+                        log.info("실제 카메라 프레임 추론 확인 (%dx%d)", frame.shape[1], frame.shape[0])
                 except Exception as exc:
                     infer_errors += 1
                     if infer_errors <= 3:

@@ -1,43 +1,93 @@
-# 하드웨어 배선 (해커톤 실제 장비 기준)
+# 하드웨어 배선·프로토콜 (해커톤 실제 장비 기준)
 
-> 아래 핀 번호는 **펌웨어 코드(`trush.ino`, `esp32.ino`)에서 읽은 값**이다. 실제 배선은 아직 눈으로 확인하지 않았다 (확인 체크리스트 참고).
+**확정 부품**: Arduino UNO R3 ×1 · ESP32 DevKitC V4 ×1 · HC-SR04 ×1 · **SG90 ×3** · MB102 전원 모듈 · 점퍼선
+아래 핀·각도는 모두 **기존 `trush.ino` 코드에서 읽은 값**이며 새로 정하지 않았다. 실제 배선은 현장에서 체크리스트로 확인한다.
 
-## A. 실제 통신 경로 (코드 기준)
+## 0. 다섯 가지 확인 질문 — 코드 기준 답
 
-```
-카메라 노트북 ──USB(9600)──▶ Arduino UNO  Serial      : 'G','M','P','L' 1바이트 명령 수신
-                ◀──────────               Serial      : "[ALERT] 쓰레기통 만차 감지!" 출력
-Arduino UNO  D3 (SoftwareSerial TX, 5V) ──▶ ESP32 GPIO16 (RX2, 3.3V)  : "FULL:TRASH"   ⚠ 레벨 변환 필요
-Arduino UNO  D2 (SoftwareSerial RX)     ◀── ESP32 GPIO17 (TX2)        : (사용하지 않음)
-카메라 노트북 ──USB(115200)──▶ ESP32 DevKitC Serial : 로그 출력만 (명령 수신 코드 없음)
-```
+| 질문 | 코드로 확인한 답 | 현장 확인 방법 |
+|---|---|---|
+| ① UNO↔ESP32 연결 방식 | UART: UNO **D3(SoftwareSerial TX)** → ESP32 **GPIO16(RX2)**, UNO D2(RX) ← GPIO17(TX2), 9600bps | 점퍼 색 따라가기, GND 공통 확인 |
+| ② ESP32가 UNO에서 받는 데이터 | 원본: `FULL:TRASH` 만 (그런데 원본 esp32.ino 는 `DATA:` 만 처리 → **무시됨**). 새 펌웨어: `HELLO`/`ACK`/`DIST` 줄 전부 | ESP32 USB 시리얼(115200)에 `UNO>` 줄이 보이는지 |
+| ③ 서보 명령 실행 보드 | **Arduino UNO** (`Servo` 3개, D9·D10·D11) | 서보 신호선이 UNO 에 꽂혀 있는지 |
+| ④ HC-SR04 연결 보드 | **Arduino UNO** (TRIG D4, ECHO D5) — ECHO 5V 가 UNO 로 가므로 레벨 변환 불필요 | |
+| ⑤ ESP32 ↔ 카메라 PC USB | ESP32 는 USB 로 **명령을 받지 않는다**(원본·새 펌웨어 모두). USB 는 로그/상태 출력용 | 장치 관리자의 COM 번호 2개 중 CP210x 쪽 |
 
-| 연결 | Arduino UNO | 대상 | 비고 |
+→ **역할 확정**: UNO = 서보 3개·초음파 1개 실제 제어 · ESP32 = UNO 데이터 중계 + (선택) Wi-Fi 로 서버 전송 · 카메라 PC = YOLO·명령·상태 관리(두 보드 모두 USB 로 감시).
+
+## 1. 서보 3개의 역할과 4개 클래스 분류 원리 (trush.ino `processDrop`)
+
+| 서보 | 핀 | 역할 | 각도 |
 |---|---|---|---|
-| 서보 X (방향) | D9 | SG90/MG 신호선 | 0°=대기, 30° 플라스틱, 145° 금속, 160° 유리, 180° 종이 |
-| 서보 Y1 (뚜껑) | D10 | 신호선 | 평상 180° / 투하 145° |
-| 서보 Y2 (뚜껑) | D11 | 신호선 | 평상 0° / 투하 25° |
-| 초음파 TRIG / ECHO | D4 / D5 | HC-SR04 | 1개. 5cm 이내 = 만차 (거리값은 보내지 않음) |
-| → ESP32 | D3 (TX) | GPIO16 (RX2) | **5V→3.3V 분압 필수** |
-| ← ESP32 | D2 (RX) | GPIO17 (TX2) | 3.3V 출력 → UNO 입력은 대개 인식됨 (사용 안 함) |
-| GND | GND | ESP32 GND · 서보 전원 GND | **모두 공통** |
+| X | D9 | 분류 방향(슈트) 회전 | 대기 0° · **플라스틱 30° · 금속 145° · 유리 160° · 종이 180°** |
+| Y1 | D10 | 뚜껑 기울임(투하) | 평상 180° → 투하 145° |
+| Y2 | D11 | 뚜껑 기울임(Y1 반대편) | 평상 0° → 투하 25° |
 
-### 전기적 주의 (필수)
-1. **Arduino D3 → ESP32 GPIO16 직결 금지.** 분압: `D3 ─[1kΩ]─┬─ GPIO16`, `┴─[2kΩ]─ GND` (≈3.3V). 또는 양방향 레벨 시프터.
-2. **서보 3개 전원은 별도 5V(≥2A, MB102 등)**. Arduino 5V 핀/ESP32 3V3 핀으로 서보를 구동하지 않는다. 서보 GND와 Arduino GND 연결.
-3. USB 2개(Arduino, ESP32)를 같은 노트북에 꽂으면 GND가 USB로도 공통이 된다.
+순서: ① X 를 클래스 각도로 회전 → 4000ms → ② Y1·Y2 기울여 투하 → 2000ms → ③ Y1·Y2 평상 → 100ms → ④ X 대기(0°).
+즉 **4개 클래스 = 서보 X 한 개의 4개 각도**, Y1·Y2 는 공통 투하 장치다. (그래서 서보 3개로 4종 분류)
+각도는 사진상의 칸 배치와 맞는지 현장에서 1회씩 확인한다. 다르면 펌웨어 상수만 고친다.
 
-### 확인 체크리스트 (현장에서 날짜와 함께 기록)
-- [ ] Arduino 장치 관리자 포트 확인 (Windows `COMx` / macOS `/dev/cu.usbmodem*` / Linux `/dev/ttyACM0`) → `edge/.env` `HW_SERIAL_PORT`
-- [ ] `python check_system.py --serial-open` PASS (Arduino IDE 시리얼 모니터는 닫을 것 — 포트는 한 프로그램만 열 수 있음)
-- [ ] 서보 각도 동작 확인: 실제 물체 투입 1회 → 해당 칸으로 1회만 이동
-- [ ] D3→GPIO16 사이 분압 저항 존재 (멀티미터로 GPIO16 쪽 전압 ≤3.3V)
-- [ ] 초음파 5cm 이내 물체 → 카메라 GUI 로그에 `[arduino] [ALERT]` → 웹 "만차 감지"
-- [ ] ESP32 사용 시: `esp32.ino`가 `DATA:`만 처리하므로 현재 `FULL:TRASH`는 서버로 가지 않음 (카메라 노트북 경로로 대체)
+| YOLO 클래스 | 명령 | X 각도 | 서버 칸 |
+|---|---|---|---|
+| Plastic | `L` | 30° | BIN_001 plastic |
+| Metal | `M` | 145° | BIN_002 metal |
+| Paper | `P` | 180° | BIN_003 paper |
+| Glass | `G` | 160° | BIN_004 glass |
 
-## B. 소프트웨어 측 안전장치 (edge/)
+모델 class id ↔ 이름은 **실행 시 `best_model.pt` 의 `names` 로 확인**한다 (기존 코드 가정 0 Glass·1 Metal·2 Paper·3 Plastic 과 다르면 경고 후 이름 기준으로 매핑).
+
+## 2. 통신 프로토콜 (통합 버전, `firmware/uno_controller` + `firmware/esp32_bridge`)
+
+| 방향 | 줄 | 의미 |
+|---|---|---|
+| PC → UNO | `G` `M` `P` `L` + 개행 | 분류 명령 (한 글자 줄만 명령으로 인정 → `C:L:3` 오동작 차단) |
+| PC → UNO | `S` | 비상 정지: 즉시 대기 자세, 진행 중 명령 `ABORTED` |
+| PC → UNO | `?` | 펌웨어 확인 → `HELLO:UNO_CTRL:1` |
+| UNO → PC/ESP32 | `ACK:<c>:START` / `ACK:<c>:DONE` | 동작 시작 / **서보 순서 완료** → 이때만 "분류 성공" |
+| UNO → PC/ESP32 | `ACK:<c>:BUSY` | 동작 중이라 거부 |
+| UNO → PC/ESP32 | `DIST:<cm>` / `DIST:ERR` | 1초마다 거리 / 측정 실패 |
+| ESP32 → PC | `UNO>…` · `ESP32:WIFI:…` · `ESP32:UNO_LINK:OK/NONE` · `ESP32:HTTP:<code>` | 중계·상태 |
+| ESP32 → 서버 | `POST /api/telemetry` kind=distance | (선택, secrets.h 설정 시) 5초마다 |
+
+- 원본 `trush.ino` 를 그대로 쓰면: 명령은 동작하지만 ACK·거리가 없다 → GUI/웹은 "명령 전송됨 · 동작 확인 불가", 적재율 "수신 없음"으로 표시(성공으로 바꾸지 않음).
+- `uno_controller` 는 trush.ino 와 **같은 핀·각도·시간**을 쓰되 `delay()` 대신 상태 머신이라 동작 중에도 센서·비상정지를 처리한다.
+
+## 3. 적재율 (HC-SR04 ×1)
+- UNO 가 `DIST:<cm>` 전송 → 카메라 PC 가 최근 5개 **중앙값 필터**, 범위(2~400cm) 밖/ERR 3회 연속 = `error`, 5초간 무응답 = **`SENSOR_DISCONNECTED`**
+- 적재율(%) = (1 − 측정거리 / 빈통거리) × 100, 0~100 제한. 빈통거리 = `.env EMPTY_DISTANCE_CM` (빈 통에서 실측). 서버도 같은 식(`fill_level.py`, full=0)으로 다시 계산해 `SENSOR_BIN_ID` 칸에 기록
+- 값이 없으면 적재율을 만들지 않는다. 센서가 없는 나머지 3칸은 "수신 없음"
+
+## 4. 배선
+```
+UNO D9  ── 서보 X 신호      UNO D4 ── HC-SR04 TRIG     HC-SR04 VCC ── 5V, GND ── GND
+UNO D10 ── 서보 Y1 신호     UNO D5 ── HC-SR04 ECHO
+UNO D11 ── 서보 Y2 신호
+서보 3개 VCC ── MB102 5V 출력 (UNO 5V 핀 아님)     서보 GND ── MB102 GND ── UNO GND ── ESP32 GND (공통)
+UNO D3 ──[1kΩ]──┬── ESP32 GPIO16      (5V → 약 3.3V 분압)
+                └─[2kΩ]── GND
+UNO D2 ── ESP32 GPIO17 (선택, 3.3V→UNO 입력은 대개 인식)
+UNO USB ── 카메라 PC      ESP32 USB ── 카메라 PC
+```
+
+### 전기적 안전 (필수)
+1. **5V 신호를 ESP32 GPIO 에 직접 넣지 않는다**: UNO D3 → GPIO16 분압 필수. HC-SR04 는 UNO 에 연결되어 있으므로 ECHO 레벨 변환은 필요 없다 (센서를 ESP32 로 옮기면 ECHO 분압 필요).
+2. **SG90 3개는 MB102 5V** 로. SG90 은 동작 시 1개당 수백 mA, 정지 토크 시 더 높다 → UNO 5V 핀/USB 전원으로 구동하지 않는다. MB102 입력은 6.5~12V DC 어댑터(또는 USB 5V) — 입력이 USB 면 총 전류가 부족할 수 있다(500mA 한계). MB102 점퍼를 **5V** 로 두었는지(3.3V 아님) 확인.
+3. UNO·ESP32·MB102 **GND 공통**.
+4. **배선 확인 전에는 서보 전원을 연결하지 않는다.** 첫 구동은 서보 혼(팔)을 떼고 각도만 확인.
+
+### 현장 체크리스트 (날짜와 함께 기록)
+- [ ] 서보 3개 신호선이 D9/D10/D11, 전원 MB102 5V, GND 공통
+- [ ] HC-SR04 TRIG D4 / ECHO D5 / VCC 5V
+- [ ] D3→GPIO16 분압 (GPIO16 쪽 전압 ≤3.3V)
+- [ ] `uno_controller.ino` 업로드 → 시리얼 모니터 9600 에 `HELLO:UNO_CTRL:1`, `DIST:…` 확인 → **모니터 닫기**
+- [ ] `esp32_bridge.ino` 업로드 → 115200 에 `UNO>DIST:…` 확인 → **모니터 닫기**
+- [ ] 클래스별 X 각도가 실제 칸과 일치 (`?`/`L`/`M`/`P`/`G` 1회씩)
+- [ ] 빈 통 거리 실측 → `EMPTY_DISTANCE_CM`, 센서 칸 → `SENSOR_BIN_ID`
+
+## 5. 소프트웨어 측 안전장치 (edge/)
 - 시리얼 포트는 `SMART_RECYCLE_AI` 프로세스 하나만 연다 (POSIX `exclusive=True`, Windows 기본 독점). 진단 도구 `check_system.py --serial-open`은 프로그램이 꺼져 있을 때만.
-- 명령 후 `HW_BUSY_SEC`(6.5초) 동안 새 명령을 보내지 않는다 (`processDrop` 블로킹 ≈ 6.1초) → `skipped_busy` 기록.
+- uno_controller: `ACK:DONE` 전까지 새 명령 안 보냄, 1.5초 내 START·10초 내 DONE 없으면 `ack_timeout`(실패). 구 펌웨어: `HW_BUSY_SEC`(6.5초) 동안 차단.
+- GUI **비상 정지** → `S` 전송 (구 펌웨어는 `S` 를 처리하지 않으므로 서보 전원 차단).
 - 시리얼이 끊기면 명령을 보내지 않고 `not_connected` 기록, 3초 간격 최대 30회 재연결 시도.
 - `C:...` 카운트 메시지를 보내지 않는다 (펌웨어가 그 안의 글자를 명령으로 오인).
 

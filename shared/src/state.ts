@@ -30,6 +30,7 @@ export function applyEvent(state: Dashboard, event: RealtimeEvent): Dashboard {
     case 'edge.status':
       return { ...state, edges: mergeBy(state.edges ?? [], [event.data], (e) => e.device_id) };
     case 'telemetry':
+      if (event.data.kind === 'distance') return { ...state, latest_distance: event.data };
       if (event.data.kind !== 'bin_full_alert') return state;
       return { ...state, latest_full_alert: event.data };
     default:

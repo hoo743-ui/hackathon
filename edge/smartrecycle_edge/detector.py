@@ -79,16 +79,74 @@ class StableTrigger:
         return False
 
 
-class YoloRunner:
-    def __init__(self, model_path: str, conf: float, target_ids: list[int] | None = None):
-        from ultralytics import YOLO  # 무거운 import는 여기서
+def pick_device(pref: str) -> str:
+    """auto: NVIDIA CUDA → CPU. CUDA 가 있어도 실제 연산이 실패하면 CPU 로 (호환성 문제 대비).
+    Apple MPS 는 간헐 오류가 있어 auto 에서 쓰지 않는다 (YOLO_DEVICE=mps 로 명시할 때만)."""
+    pref = (pref or "auto").strip().lower()
+    if pref not in ("", "auto"):
+        return pref
+    try:
+        import torch
 
-        self.model = YOLO(model_path)
+        if torch.cuda.is_available():
+            torch.zeros(1).cuda()  # 드라이버/CUDA 호환 확인
+            return "0"
+    except Exception as exc:
+        log.warning("GPU 사용 불가 → CPU: %s", exc)
+    return "cpu"
+
+
+def device_label(device: str) -> str:
+    if device == "cpu":
+        return "CPU"
+    if device == "mps":
+        return "GPU (Apple MPS)"
+    try:
+        import torch
+
+        return f"GPU (CUDA: {torch.cuda.get_device_name(int(device))})"
+    except Exception:
+        return f"GPU ({device})"
+
+
+class ModelLoadError(Exception):
+    pass
+
+
+class YoloRunner:
+    """추론 전용(INFERENCE ONLY). 시작 시 한 번만 로드하고 학습·데이터셋·YAML 을 요구하지 않는다."""
+
+    def __init__(self, model_path: str, conf: float, target_ids: list[int] | None = None,
+                 device: str = "auto", imgsz: int = 640):
+        try:
+            from ultralytics import YOLO  # 무거운 import는 여기서
+
+            self.model = YOLO(model_path, task="detect")
+        except Exception as exc:
+            raise ModelLoadError(f"모델을 불러올 수 없습니다 (파일 손상/형식 오류/버전 불일치 가능): {exc}") from exc
         self.model_path = model_path
         self.conf = conf
+        self.imgsz = imgsz
         self.names: dict[int, str] = {int(k): str(v) for k, v in self.model.names.items()}
         self.target_ids = target_ids
+        self.device = pick_device(device)
+        self.device_label = device_label(self.device)
+        self.camera_verified = False  # 실제 카메라 프레임으로 추론 성공했는지
+
+    def warmup(self) -> None:
+        import numpy as np
+
+        try:
+            self(np.zeros((self.imgsz, self.imgsz, 3), dtype=np.uint8))
+        except Exception as exc:
+            if self.device != "cpu":
+                log.warning("%s 추론 실패 → CPU로 전환: %s", self.device_label, exc)
+                self.device, self.device_label = "cpu", "CPU (GPU 실패 후 전환)"
+                self(np.zeros((self.imgsz, self.imgsz, 3), dtype=np.uint8))
+            else:
+                raise ModelLoadError(f"모델 시험 추론 실패: {exc}") from exc
 
     def __call__(self, frame):
-        # 기존 코드: model(frame, conf=0.5, classes=[0,1,2,3]) — 모델 클래스 전체가 4개면 동일
-        return self.model(frame, conf=self.conf, classes=self.target_ids or None, verbose=False)[0]
+        # 기존 코드: model(frame, conf=0.5, classes=[0,1,2,3])
+        return self.model(frame, conf=self.conf, classes=self.target_ids or None, imgsz=self.imgsz,
+                          device=self.device, verbose=False)[0]
