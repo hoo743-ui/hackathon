@@ -13,10 +13,10 @@ AI 카메라로 쓰레기(유리·금속·종이·플라스틱)를 분류해 서
 | 어디서 | 무엇을 | 명령 |
 |---|---|---|
 | MacBook | 서버 + 웹 (+ 앱 개발 서버) | `./start_server.sh` (앱까지: `./start_server.sh --mobile`) · 종료 `./stop_server.sh` |
-| 카메라 노트북 | 카메라·YOLO·하드웨어·전송 (단일 프로그램) | `edge\dist\SMART_RECYCLE_AI\SMART_RECYCLE_AI.exe` 또는 `python edge/smart_recycle_ai.py` · 점검 `python edge/check_system.py` |
+| 카메라 노트북 | 카메라·YOLO·하드웨어·전송 (단일 프로그램) | **`edge\START_SMART_RECYCLE.bat`** (git pull → 설치 확인 → 실행, 팀 설정은 `edge/settings.env` 로 자동 적용) · EXE: `edge\build_exe.bat` · 점검 `python edge/check_system.py` |
 | 스마트폰 | 관리자 앱 | Expo Go 로 맥북 터미널의 QR 스캔 |
 
-문서: [DEMO_GUIDE](docs/DEMO_GUIDE.md) · [FIRMWARE_UPLOAD](docs/FIRMWARE_UPLOAD.md) · [NETWORK_SETUP](docs/NETWORK_SETUP.md) · [HARDWARE_WIRING](docs/HARDWARE_WIRING.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [INTEGRATION_AUDIT](docs/INTEGRATION_AUDIT.md) · [DEMO_END_TO_END_TEST](docs/DEMO_END_TO_END_TEST.md) · [edge/README](edge/README.md)
+문서: [PRESENTATION](docs/PRESENTATION.md) · [DEMO_GUIDE](docs/DEMO_GUIDE.md) · [FIRMWARE_UPLOAD](docs/FIRMWARE_UPLOAD.md) · [NETWORK_SETUP](docs/NETWORK_SETUP.md) · [HARDWARE_WIRING](docs/HARDWARE_WIRING.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [INTEGRATION_AUDIT](docs/INTEGRATION_AUDIT.md) · [DEMO_END_TO_END_TEST](docs/DEMO_END_TO_END_TEST.md) · [edge/README](edge/README.md)
 
 원본 입력 코드 `yolo_arduino.py`, `trush.ino`, `esp32.ino` 는 저장소 루트에 그대로 있다. `best_model.pt` 는 Git에 없으므로 카메라 노트북의 `edge/models/` 에 직접 넣는다.
 
