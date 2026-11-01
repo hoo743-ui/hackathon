@@ -17,7 +17,7 @@
 5. 리허설: `docs/DEMO_END_TO_END_TEST.md` 표를 실제 장비로 채우기
 
 ## 당일 순서
-1. **네트워크**: 세 기기 같은 Wi-Fi (불안하면 핫스팟). 맥북 IP 확인 `ipconfig getifaddr en0`
+1. **네트워크**: 세 기기 같은 Wi-Fi. 기기끼리 통신이 안 되면 **휴대폰 핫스팟** ([NETWORK_SETUP §7](NETWORK_SETUP.md)). 맥북에서 `scripts/update-lan-ip.sh --print` → 카메라 컴퓨터에 넣을 서버 주소·Expo 주소 확인
 2. **맥북**: Docker Desktop(또는 colima) 실행 → `./start_server.sh --mobile` → 마지막 출력의 주소 메모
 3. **웹**: 맥북 브라우저 `http://localhost:5173` (프로젝터) — 상단 "실시간 연결됨" 확인
 4. **폰**: Expo Go로 QR 스캔 → 홈 탭 "실시간 인식" 확인

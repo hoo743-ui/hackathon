@@ -41,7 +41,20 @@ DEVICE_ID=CAMERA_001
 - 앱 주소는 `mobile/app/.env` 의 `EXPO_PUBLIC_API_BASE_URL=http://<맥북IP>:8000` (start/mobile 스크립트가 자동 갱신)
 - 폰 브라우저로 `http://<맥북IP>:8000/api/health` 가 열리는지 먼저 확인하면 원인 분리가 빠르다.
 
-## 7. 장애 대응
+## 7. 휴대폰 핫스팟으로 전환 (행사장 Wi-Fi가 기기 간 통신을 막을 때)
+증상: 카메라 컴퓨터 브라우저에서 `http://<맥북IP>:8000/api/health` 가 열리지 않고, 서버 로그(`logs/backend.log`)에 카메라 컴퓨터 IP의 요청이 한 줄도 없다 (401 도 없음) → 클라이언트 격리.
+
+1. 폰 핫스팟 켜기 (아이폰: "최대 호환성" 켜기) · 충전기 연결
+2. 맥북 · 카메라 컴퓨터 · 앱 볼 폰을 모두 그 핫스팟에 연결
+3. 맥북: `scripts/update-lan-ip.sh --print` → 새 IP 반영 + 카메라 컴퓨터에 넣을 주소 출력
+   (서버는 0.0.0.0 으로 떠 있어 재시작 불필요, CORS 는 사설 대역 정규식으로 허용 — 10.x / 172.16~31.x / 192.168.x)
+4. 맥북: Expo 재시작 `scripts/mobile.sh` (앱 주소는 Expo 시작 시 고정됨) → 폰 Expo Go `exp://<새IP>:8081`
+5. 카메라 컴퓨터: 브라우저로 `http://<새IP>:8000/api/health` 확인 → 프로그램 **설정 › 맥북 서버 주소** 변경 → 저장 후 재시작
+6. 맥북: `grep -v "<맥북IP>" logs/backend.log | tail` 로 카메라 컴퓨터 요청(`POST /api/edge/heartbeat 200`) 확인
+
+핫스팟을 끄거나 바꾸면 IP 가 다시 바뀐다 → 시연 끝까지 같은 핫스팟 유지.
+
+## 8. 장애 대응
 | 증상 | 원인 후보 | 조치 |
 |---|---|---|
 | 카메라 GUI "맥북 서버 연결 안 됨" | IP 변경, 다른 Wi-Fi, 서버 꺼짐 | 맥북 `ipconfig getifaddr en0` → `.env` 수정 → GUI "서버 재시도". 그동안 분류는 outbox에 저장됨 |
