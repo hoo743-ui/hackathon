@@ -122,9 +122,12 @@ describe('theme', () => {
     expect(resolveScheme('dark', 'light')).toBe('dark');
   });
   it('사양 토큰 값', () => {
-    expect(colors.light.bg).toBe('#F3F1EC');
-    expect(colors.dark.bg).toBe('#111315');
-    expect(colors.light.material.plastic).toBe('#2E6F95');
+    // SMART RECYCLE 브랜드 (웹 tokens.css 와 동일)
+    expect(colors.light.bg).toBe('#F6F9F6');
+    expect(colors.light.ruleStrong).toBe('#0D4335');
+    expect(colors.light.ok).toBe('#1B7957');
+    expect(colors.dark.bg).toBe('#0B1613');
+    expect(colors.light.material).toEqual({ plastic: '#2D77CD', metal: '#845CB5', paper: '#BE893A', glass: '#738289' });
     expect(colors.light.fill.critical).toBe(colors.light.critical);
   });
 });

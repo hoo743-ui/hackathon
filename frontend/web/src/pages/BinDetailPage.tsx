@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { FILL_LEVEL_LABELS, FILL_THRESHOLDS, SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel } from '@shared';
+import { FILL_LEVEL_LABELS, FILL_THRESHOLDS, SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel, binReading } from '@shared';
 import type { Bin, Calibration } from '@shared';
 import { useDashboard } from '../data/DashboardContext';
 import { ChartLegend, TrendChart } from '../components/charts';
@@ -144,16 +144,18 @@ function BackLink() {
 }
 
 function CurrentState({ bin, now }: { bin: Bin; now: number }) {
-  const level = fillLevel(bin.current_fill_percent);
+  const reading = binReading(bin);
+  const level = fillLevel(reading.percent);
   const warn = binWarning(bin);
   return (
     <div className="current" data-testid={`bin-detail-${bin.bin_id}`}>
       <div className="current__figure">
-        <MaterialColumn type={bin.waste_type} percent={bin.current_fill_percent} calibrated={bin.calibrated} size="lg" />
+        <MaterialColumn type={bin.waste_type} percent={reading.percent} calibrated={bin.calibrated || reading.percent !== null} size="lg" />
         <div className="current__readout">
-          <FillReadout percent={bin.current_fill_percent} calibrated={bin.calibrated} size="xl" />
-          <StatusText tone={LEVEL_TONE[level]} strong>
-            {levelLabel(bin.current_fill_percent, bin.calibrated)}
+          <FillReadout percent={reading.percent} calibrated={bin.calibrated || reading.percent !== null} size="xl" />
+          <StatusText tone={reading.state === 'live' ? LEVEL_TONE[level] : reading.state === 'no_sensor' ? 'unknown' : 'critical'} strong>
+            {reading.state === 'live' ? levelLabel(reading.percent, true) : reading.label}
+            {reading.lastPercent !== null && reading.state !== 'live' ? ` · 마지막 ${reading.lastPercent.toFixed(1)}%` : ''}
           </StatusText>
           {warn && (
             <p className="current__warn" data-tone={warn.tone}>

@@ -107,7 +107,7 @@ export function OverviewPage() {
 
       <div className="ov-live ov-grid">
         <Section title="실시간 인식" className="ov-live__main" aside={<Link to="/sorting">분류 기록</Link>}>
-          <LiveDetection d={last} now={now} />
+          <LiveDetection key={last?.id ?? 'none'} d={last} now={now} />
           <DetectionStrip items={detections} />
         </Section>
         <Section title="카메라 노트북 · 센서" className="ov-live__edge">

@@ -19,8 +19,7 @@ import {
   WASTE_LABELS,
   fillLevel,
   type Calibration,
-  type SensorLog,
-} from '../../services/shared';
+  type SensorLog, binReading } from '../../services/shared';
 import { useNow } from '../../services/useNow';
 import { useTheme } from '../../theme/useTheme';
 
@@ -77,8 +76,9 @@ export default function BinDetailScreen() {
   const desc = asc.slice().reverse();
   const times = asc.map((p) => new Date(p.measured_at).getTime());
   const median = medianInterval(times) ?? 60000;
-  const level = fillLevel(bin?.current_fill_percent ?? null);
-  const r = fillReadout(bin?.current_fill_percent ?? null, 1);
+  const reading = bin ? binReading(bin) : null;
+  const level = fillLevel(reading?.percent ?? null);
+  const r = fillReadout(reading?.percent ?? null, 1);
   const errorCount = asc.filter((p) => p.sensor_status !== 'normal').length;
 
   return (
@@ -112,7 +112,7 @@ export default function BinDetailScreen() {
         <>
           {/* 판독 영역: 큰 컬럼 + readout-xl */}
           <View style={{ flexDirection: 'row', gap: space.s4, alignItems: 'flex-end' }}>
-            <MaterialColumn percent={bin.current_fill_percent} type={bin.waste_type} width={72} height={216} tickLabels />
+            <MaterialColumn percent={reading?.percent ?? null} type={bin.waste_type} width={72} height={216} tickLabels />
             <View style={{ flex: 1, gap: space.s2, minWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
                 <MaterialCode type={bin.waste_type} size="lg" />
@@ -122,8 +122,11 @@ export default function BinDetailScreen() {
                 </View>
               </View>
               <DataSourceTag simulated={isSimulated(dashboard) || device?.data_source === 'simulator'} />
-              <Readout size="xl" value={r.value} unit={r.unit} accessibilityLabel={`적재율 ${formatFill(bin.current_fill_percent)}`} />
-              <Text style={[t.bodyStrong, { color: level === 'normal' ? c.ok : level === 'unknown' ? c.ink3 : c.fill[level] }]}>{levelCaption(level)}</Text>
+              <Readout size="xl" value={r.value} unit={r.unit} accessibilityLabel={`적재율 ${reading?.state === 'live' ? formatFill(reading.percent) : reading?.label}`} />
+              <Text style={[t.bodyStrong, { color: reading?.state === 'live' ? (level === 'normal' ? c.ok : level === 'unknown' ? c.ink3 : c.fill[level]) : reading?.state === 'no_sensor' ? c.ink3 : c.critical }]}>
+                {reading?.state === 'live' ? levelCaption(level) : reading?.label}
+                {reading && reading.lastPercent !== null && reading.state !== 'live' ? ` · 마지막 ${reading.lastPercent.toFixed(1)}%` : ''}
+              </Text>
               <Text style={[t.label, { color: c.ink2 }]}>
                 {formatRelative(bin.updated_at, now)} 측정 · <Text style={t.mono}>{formatTime(bin.updated_at)}</Text>
               </Text>

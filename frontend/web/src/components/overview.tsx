@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ALERT_KIND_LABELS, FILL_THRESHOLDS, SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel } from '@shared';
+import { ALERT_KIND_LABELS, FILL_THRESHOLDS, SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel, binReading } from '@shared';
 import type { Alert, AlertSeverity, Bin } from '@shared';
 import { formatDistance, formatRelative, formatTime } from '../lib/format';
 import { FillReadout, LEVEL_TONE, MaterialCode, MaterialColumn, levelLabel } from './material';
@@ -18,7 +18,9 @@ export function binWarning(bin: Bin): { tone: Tone; text: string } | null {
 
 /** 개요의 수거함 한 칸: 코드칩 · 컬럼 · 판독값 · ledger 행 */
 export function BinColumnCell({ bin, now }: { bin: Bin; now: number }) {
-  const level = fillLevel(bin.current_fill_percent);
+  // 현재값은 센서가 정상일 때만. 끊김·미설치는 숫자 대신 상태 문구 (마지막 값을 현재처럼 보이지 않게)
+  const reading = binReading(bin);
+  const level = fillLevel(reading.percent);
   const warn = binWarning(bin);
   const sensorBad = bin.sensor_status !== null && bin.sensor_status !== 'normal';
   return (
@@ -30,12 +32,13 @@ export function BinColumnCell({ bin, now }: { bin: Bin; now: number }) {
         </Link>
       </header>
       <div className="bincell__figure">
-        <MaterialColumn type={bin.waste_type} percent={bin.current_fill_percent} calibrated={bin.calibrated} size="md" />
+        <MaterialColumn type={bin.waste_type} percent={reading.percent} calibrated={bin.calibrated || reading.percent !== null} size="md" />
       </div>
       <div className="bincell__readout">
-        <FillReadout percent={bin.current_fill_percent} calibrated={bin.calibrated} />
-        <span className="bincell__level" data-tone={LEVEL_TONE[level]}>
-          {levelLabel(bin.current_fill_percent, bin.calibrated)}
+        <FillReadout percent={reading.percent} calibrated={bin.calibrated || reading.percent !== null} />
+        <span className="bincell__level" data-tone={reading.state === 'live' ? LEVEL_TONE[level] : reading.state === 'no_sensor' ? 'unknown' : 'critical'}>
+          {reading.state === 'live' ? levelLabel(reading.percent, true) : reading.label}
+          {reading.lastPercent !== null && reading.state !== 'live' ? ` · 마지막 ${reading.lastPercent.toFixed(1)}%` : ''}
         </span>
       </div>
       <p className="bincell__warn" data-tone={warn?.tone ?? 'none'} aria-live="polite">

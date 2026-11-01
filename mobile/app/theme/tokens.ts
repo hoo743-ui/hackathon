@@ -34,61 +34,63 @@ export interface ColorTokens {
   fill: Record<FillLevel, string>;
 }
 
-const lightMaterial: Record<WasteType, string> = { plastic: '#2E6F95', metal: '#6D4FA0', paper: '#8C6A2F', glass: '#3F4449' };
-const darkMaterial: Record<WasteType, string> = { plastic: '#6FA8D1', metal: '#A98BD3', paper: '#C9A465', glass: '#9AA1A8' };
+// 재질색 — 웹(tokens.css)과 동일. 상태 표시에 쓰지 않음
+const lightMaterial: Record<WasteType, string> = { plastic: '#2D77CD', metal: '#845CB5', paper: '#BE893A', glass: '#738289' };
+const darkMaterial: Record<WasteType, string> = { plastic: '#6AA6E8', metal: '#B094D6', paper: '#D9AE6A', glass: '#A3B0B5' };
 
 export const colors: Record<Scheme, ColorTokens> = {
   light: {
-    bg: '#F3F1EC',
-    surface: '#FBFAF7',
-    surfaceSunken: '#E9E6DF',
-    ink: '#16181B',
-    ink2: '#4A4F55',
-    ink3: '#6B7076',
-    rule: '#D6D2C8',
-    ruleStrong: '#16181B',
-    accent: '#3D5A66',
-    ok: '#1F6B4A',
+    // SMART RECYCLE 브랜드 — 진녹 #0D4335 · 그린 #1B7957 · 틸 #41848B · 민트 #DCF0E5 (웹과 동일)
+    bg: '#F6F9F6',
+    surface: '#FFFFFF',
+    surfaceSunken: '#EEF4EF',
+    ink: '#1C2F2B',
+    ink2: '#3F564F',
+    ink3: '#637770',
+    rule: '#D3E1D8',
+    ruleStrong: '#0D4335',
+    accent: '#41848B',
+    ok: '#1B7957',
     attention: '#8A5A00',
     warning: '#C2410C',
     critical: '#B3261E',
-    unknown: '#8D9196',
-    signal: '#D9480F',
+    unknown: '#8D9A95',
+    signal: '#0D4335',
     onSignal: '#FFFFFF',
     onCritical: '#FFFFFF',
-    scrim: 'rgba(22,24,27,0.45)',
+    scrim: 'rgba(13,67,53,0.45)',
     material: lightMaterial,
-    fill: { normal: '#1F6B4A', attention: '#8A5A00', warning: '#C2410C', critical: '#B3261E', unknown: '#8D9196' },
+    fill: { normal: '#1B7957', attention: '#8A5A00', warning: '#C2410C', critical: '#B3261E', unknown: '#8D9A95' },
   },
   dark: {
-    bg: '#111315',
-    surface: '#181B1E',
-    surfaceSunken: '#0C0E10',
-    ink: '#ECEAE4',
-    ink2: '#A9ADB2',
-    ink3: '#8A8F95',
-    rule: '#2A2E33',
-    ruleStrong: '#ECEAE4',
-    accent: '#8FB3C2',
-    ok: '#4FB286',
+    bg: '#0B1613',
+    surface: '#11201C',
+    surfaceSunken: '#08110F',
+    ink: '#E6EFEA',
+    ink2: '#AABDB5',
+    ink3: '#82978F',
+    rule: '#23362F',
+    ruleStrong: '#DCF0E5',
+    accent: '#6FB3B9',
+    ok: '#4FBF8B',
     attention: '#E0A33A',
     warning: '#FF7A3D',
     critical: '#F2665C',
-    unknown: '#6B7076',
-    signal: '#FF7A3D',
-    onSignal: '#111315',
-    // 다크의 critical(#F2665C)은 밝으므로 흑연 글자가 AA 대비를 만족한다
-    onCritical: '#111315',
+    unknown: '#6F817B',
+    signal: '#4FBF8B',
+    onSignal: '#0B1613',
+    // 다크의 critical(#F2665C)은 밝으므로 어두운 글자가 AA 대비를 만족한다
+    onCritical: '#0B1613',
     scrim: 'rgba(0,0,0,0.6)',
     material: darkMaterial,
-    fill: { normal: '#4FB286', attention: '#E0A33A', warning: '#FF7A3D', critical: '#F2665C', unknown: '#6B7076' },
+    fill: { normal: '#4FBF8B', attention: '#E0A33A', warning: '#FF7A3D', critical: '#F2665C', unknown: '#6F817B' },
   },
 };
 
 /** 간격 4 기반 (--s1…--s8) */
 export const space = { s1: 4, s2: 8, s3: 12, s4: 16, s5: 24, s6: 32, s7: 48, s8: 64 } as const;
-/** 반경: 괘선 0, 칩 2, 패널 4, 긴급정지 6. 카드 전체를 둥글게 만들지 않는다. */
-export const radius = { none: 0, chip: 2, panel: 4, estop: 6 } as const;
+/** 반경: 카드 14 · 패널 12 · 버튼 8 · 칩 6 (웹 --r-card/--r-panel/--r-btn/--r-chip 과 동일) */
+export const radius = { none: 0, chip: 6, btn: 8, panel: 12, card: 14, estop: 10 } as const;
 /** 최소 터치 영역 (pt) */
 export const touchTarget = 44;
 /** 섹션 괘선 두께 */

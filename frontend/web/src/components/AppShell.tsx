@@ -233,7 +233,7 @@ function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
         <div className="drawer__head">
           <span className="brand">
             <BrandMark />
-            <span className="brand__name">스마트 분리수거</span>
+            <span className="brand__name"><span className="brand__title">SMART RECYCLE</span><span className="brand__sub">스마트 분리수거 관제</span></span>
           </span>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="메뉴 닫기">
             <X size={20} strokeWidth={1.75} aria-hidden />
@@ -264,7 +264,7 @@ export function AppShell({ mode, onModeChange }: ModeProps) {
       <aside className="sidebar">
         <div className="brand">
           <BrandMark />
-          <span className="brand__name">스마트 분리수거</span>
+          <span className="brand__name"><span className="brand__title">SMART RECYCLE</span><span className="brand__sub">스마트 분리수거 관제</span></span>
         </div>
         <nav aria-label="주 메뉴">
           <NavList rail />

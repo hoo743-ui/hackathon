@@ -32,6 +32,7 @@ export const setDataModeOverride = (mode: 'live' | 'mock' | null): void => write
 export type ThemePref = 'light' | 'dark' | 'system';
 export function getThemePref(): ThemePref {
   const v = read(THEME_KEY);
-  return v === 'light' || v === 'dark' ? v : 'system';
+  // 기본 = 라이트 (발표·현장 화면을 브랜드 색으로 통일). 사용자가 고르면 그 값을 유지
+  return v === 'light' || v === 'dark' || v === 'system' ? v : 'light';
 }
-export const setThemePref = (pref: ThemePref): void => write(THEME_KEY, pref === 'system' ? null : pref);
+export const setThemePref = (pref: ThemePref): void => write(THEME_KEY, pref);

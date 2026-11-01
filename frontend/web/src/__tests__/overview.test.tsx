@@ -66,12 +66,12 @@ describe('개요 화면', () => {
     expect(cell.textContent).not.toMatch(/(^|\D)0%/);
   });
 
-  it('보정은 되었지만 유효 측정이 없으면 "측정값 없음" 으로 표시한다', async () => {
+  it('센서 응답 없음이면 현재 적재율 대신 "측정 오류" 로 표시한다', async () => {
     const d = makeDashboard();
     d.bins[1] = makeBin({ bin_id: 'BIN_002', waste_type: 'metal', current_fill_percent: null, calibrated: true, sensor_status: 'timeout' });
     renderApp(makeTestSource(d));
     const cell = await screen.findByTestId('bin-card-BIN_002');
-    expect(within(cell).getAllByText('측정값 없음').length).toBeGreaterThan(0);
+    expect(within(cell).getAllByText(/측정 오류/).length).toBeGreaterThan(0);
     expect(cell.textContent).not.toMatch(/(^|\D)0%/);
     expect(within(cell).getByTestId('sensor-status')).toHaveTextContent('응답 없음');
   });

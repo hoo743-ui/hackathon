@@ -1,0 +1,276 @@
+/*
+ * SMART RECYCLE 디자인 레이어 — 운영 대시보드 (진녹 · 민트 · 청회 + 재질 4색)
+ * 기존 컴포넌트 구조는 그대로 두고 표면(카드·사이드바·버튼·타이포)만 브랜드 규칙으로 덮는다.
+ * 색은 tokens.css 의 변수만 사용한다. 마지막에 import 된다 (main.tsx).
+ */
+
+/* ---------- 공통: 숫자 정렬 ---------- */
+.t-mono,
+.readout,
+.readout__value,
+.conf,
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 사이드바: 진녹 브랜드 패널 ---------- */
+:root {
+  --sb-bg: #0d4335;
+  --sb-ink: #e7f3ec;
+  --sb-ink-2: #a9cdbd;
+  --sb-hover: rgb(255 255 255 / 0.08);
+  --sb-active: rgb(255 255 255 / 0.14);
+  --sb-rule: rgb(255 255 255 / 0.12);
+}
+:root[data-theme='dark'] {
+  --sb-bg: #08110f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --sb-bg: #08110f;
+  }
+}
+.sidebar {
+  background: var(--sb-bg);
+  border-right: 0;
+  color: var(--sb-ink);
+}
+.sidebar .brand {
+  border-bottom: 1px solid var(--sb-rule);
+  color: #ffffff;
+}
+.brand__name {
+  display: grid;
+  line-height: 1.1;
+}
+.brand__title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.brand__sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sb-ink-2);
+  letter-spacing: 0;
+}
+.brand__mark {
+  padding: 5px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.1);
+}
+.brand__mark i {
+  border-radius: 2px;
+}
+.sidebar .nav__link {
+  color: var(--sb-ink-2);
+  border-radius: var(--r-btn);
+}
+.sidebar .nav__link svg {
+  color: var(--sb-ink-2);
+}
+.sidebar .nav__link:hover {
+  color: #ffffff;
+  background: var(--sb-hover);
+}
+.sidebar .nav__link.active {
+  color: #ffffff;
+  background: var(--sb-active);
+  box-shadow: inset 3px 0 0 #7fd3a8;
+}
+.sidebar .nav__link.active svg {
+  color: #ffffff;
+}
+.sidebar .side-foot {
+  color: var(--sb-ink-2);
+}
+.sidebar .side-foot * {
+  color: inherit;
+}
+.sidebar :focus-visible {
+  outline: 2px solid #7fd3a8;
+  outline-offset: 2px;
+}
+
+/* ---------- 상단 바 ---------- */
+.topbar {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ---------- 카드: Section ---------- */
+.section,
+.section--light {
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-top: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+}
+.section__title {
+  font-size: 18px;
+  line-height: 24px;
+  color: var(--ink);
+}
+.section .section {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+@media (max-width: 767px) {
+  .section,
+  .section--light {
+    padding: var(--s4);
+    border-radius: 12px;
+  }
+}
+
+/* ---------- 상태 요약 줄 → 지표 카드 띠 ---------- */
+.status-ledger {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.status-ledger__cell {
+  padding: var(--s4) var(--s5);
+}
+.status-ledger__cell:first-child {
+  padding-left: var(--s5);
+}
+
+/* ---------- 버튼 · 입력 · 칩 ---------- */
+.btn,
+.seg,
+.estop__btn,
+.icon-btn {
+  border-radius: var(--r-btn);
+}
+.btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+:root[data-theme='dark'] .btn--primary {
+  color: #0b1613;
+}
+.tag,
+.mcode {
+  border-radius: var(--r-chip);
+}
+input,
+select,
+textarea {
+  border-radius: var(--r-btn);
+}
+.notice {
+  border-radius: var(--r-panel);
+}
+.dialog {
+  border-radius: var(--r-card);
+}
+.table-wrap {
+  border: 1px solid var(--rule);
+  border-radius: var(--r-panel);
+  overflow: auto;
+}
+.table thead th {
+  background: var(--surface-sunken);
+}
+
+/* ---------- 실시간 인식 ---------- */
+.live {
+  border-radius: var(--r-panel);
+}
+.live--new {
+  animation: live-arrive 1.6s ease-out;
+}
+@keyframes live-arrive {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 45%, transparent);
+    background: var(--ok-wash);
+  }
+  100% {
+    box-shadow: 0 0 0 12px transparent;
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live--new {
+    animation: none;
+  }
+}
+.detimg {
+  border-radius: var(--r-panel);
+  border-color: var(--rule);
+}
+.live__label {
+  color: var(--ink);
+}
+.live__id {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-btn);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.copy-btn:hover {
+  border-color: var(--teal);
+  color: var(--ink);
+}
+.strip__item .detimg {
+  border-radius: 10px;
+}
+.edge__item {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-panel);
+  background: var(--surface-sunken);
+}
+
+/* ---------- 적재율 컬럼 ---------- */
+.mcol__body {
+  border-radius: 6px;
+}
+
+/* ---------- 좁은 화면: 상태 카드 띠 2×2 안쪽 여백 ---------- */
+@media (max-width: 1023px) {
+  .status-ledger__cell,
+  .status-ledger__cell:first-child,
+  .status-ledger__cell:nth-child(3) {
+    padding: var(--s4);
+  }
+}
+@media (max-width: 767px) {
+  .status-ledger__cell,
+  .status-ledger__cell:first-child,
+  .status-ledger__cell:nth-child(3) {
+    padding: var(--s3) var(--s4);
+  }
+}
+
+/* ---------- 표: 카드 안쪽 여백 ---------- */
+.table-wrap .table th:first-child,
+.table-wrap .table td:first-child {
+  padding-left: var(--s4);
+}
+.table-wrap .table th:last-child,
+.table-wrap .table td:last-child {
+  padding-right: var(--s4);
+}

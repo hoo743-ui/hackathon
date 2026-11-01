@@ -24,7 +24,7 @@ describe('헤더 앱 설정 메뉴', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     fireEvent.click(within(menu).getByRole('button', { name: '시스템' }));
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
-    expect(window.localStorage.getItem('smartbin.theme')).toBeNull();
+    expect(window.localStorage.getItem('smartbin.theme')).toBe('system'); // 기본은 라이트 → '시스템' 선택도 저장
   });
 
   it('Esc 로 닫히고 제어 토큰을 저장한다', async () => {

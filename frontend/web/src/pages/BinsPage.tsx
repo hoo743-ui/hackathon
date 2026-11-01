@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel } from '@shared';
+import { SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel, binReading } from '@shared';
 import { useDashboard } from '../data/DashboardContext';
 import { Sparkline } from '../components/charts';
 import { LEVEL_TONE, MaterialCode, MaterialColumn, levelLabel } from '../components/material';
@@ -54,7 +54,8 @@ export function BinsPage() {
               </thead>
               <tbody>
                 {bins.map((b) => {
-                  const level = fillLevel(b.current_fill_percent);
+                  const reading = binReading(b);
+                  const level = fillLevel(reading.percent);
                   const sensorBad = b.sensor_status !== null && b.sensor_status !== 'normal';
                   return (
                     <tr key={b.bin_id} className="row-link" data-testid={`bin-row-${b.bin_id}`} onClick={() => navigate(`/bins/${b.bin_id}`)}>
@@ -71,15 +72,17 @@ export function BinsPage() {
                       </th>
                       <td className="num">
                         <span className="fill-cell">
-                          <MaterialColumn type={b.waste_type} percent={b.current_fill_percent} calibrated={b.calibrated} size="xs" ticks={false} />
+                          <MaterialColumn type={b.waste_type} percent={reading.percent} calibrated={b.calibrated || reading.percent !== null} size="xs" ticks={false} />
                           <span className="fill-cell__val">
-                            {fillNumber(b.current_fill_percent)}
-                            {b.current_fill_percent !== null && <small>%</small>}
+                            {fillNumber(reading.percent)}
+                            {reading.percent !== null && <small>%</small>}
                           </span>
                         </span>
                       </td>
                       <td>
-                        <StatusText tone={LEVEL_TONE[level]}>{levelLabel(b.current_fill_percent, b.calibrated)}</StatusText>
+                        <StatusText tone={reading.state === 'live' ? LEVEL_TONE[level] : reading.state === 'no_sensor' ? 'unknown' : 'critical'}>
+                          {reading.state === 'live' ? levelLabel(reading.percent, true) : reading.label}
+                        </StatusText>
                       </td>
                       <td className="num col-md">{formatDistance(b.current_distance_cm)}</td>
                       <td className={sensorBad ? 'is-bad' : ''}>{b.sensor_status ? SENSOR_STATUS_LABELS[b.sensor_status] : '--'}</td>

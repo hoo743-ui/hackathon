@@ -11,7 +11,7 @@ import { Empty, ErrorNotice, Loading, Section } from '../../components/primitive
 import type { Point } from '../../services/chart';
 import { useDashboard } from '../../services/DashboardContext';
 import { fillReadout, formatDistance, formatTime } from '../../services/format';
-import { FILL_LEVEL_LABELS, SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel, type Bin, type Trend } from '../../services/shared';
+import { FILL_LEVEL_LABELS, SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel, type Bin, type Trend, binReading } from '../../services/shared';
 import { useTheme } from '../../theme/useTheme';
 
 const TREND_HOURS = 24;
@@ -43,8 +43,9 @@ export default function BinsScreen() {
 
   const bins = dashboard?.bins ?? [];
   const counts = bins.reduce<Record<string, number>>((acc, b) => {
-    const l = fillLevel(b.current_fill_percent);
-    acc[l] = (acc[l] ?? 0) + 1;
+    const rd = binReading(b);
+    const key = rd.state === 'live' ? fillLevel(rd.percent) : rd.state;
+    acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
   const summary = [
@@ -52,7 +53,10 @@ export default function BinsScreen() {
     counts.critical ? `위험 ${counts.critical}` : null,
     counts.warning ? `경고 ${counts.warning}` : null,
     counts.attention ? `주의 ${counts.attention}` : null,
-    counts.unknown ? `미보정 ${counts.unknown}` : null,
+    counts.disconnected ? `센서 끊김 ${counts.disconnected}` : null,
+    counts.error ? `측정 오류 ${counts.error}` : null,
+    counts.uncalibrated ? `미보정 ${counts.uncalibrated}` : null,
+    counts.no_sensor ? `센서 없음 ${counts.no_sensor}` : null,
   ].filter(Boolean);
 
   const pointsFor = (binId: string): Point[] =>
@@ -83,9 +87,10 @@ export default function BinsScreen() {
 function BinLedgerRow({ bin, points, last }: { bin: Bin; points: Point[]; last: boolean }) {
   const { c, t, space } = useTheme();
   const router = useRouter();
-  const level = fillLevel(bin.current_fill_percent);
-  const r = fillReadout(bin.current_fill_percent);
-  const sensorText = bin.sensor_status ? `센서 ${SENSOR_STATUS_LABELS[bin.sensor_status]}` : '측정 없음';
+  const reading = binReading(bin);
+  const level = fillLevel(reading.percent);
+  const r = fillReadout(reading.percent);
+  const sensorText = bin.sensor_status ? `센서 ${SENSOR_STATUS_LABELS[bin.sensor_status]}` : '센서 수신 없음';
   const sensorBad = bin.sensor_status !== null && bin.sensor_status !== 'normal';
   return (
     <Pressable
@@ -102,7 +107,7 @@ function BinLedgerRow({ bin, points, last }: { bin: Bin; points: Point[]; last: 
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <MaterialColumn percent={bin.current_fill_percent} type={bin.waste_type} width={20} height={64} />
+      <MaterialColumn percent={reading.percent} type={bin.waste_type} width={20} height={64} />
       <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <MaterialCode type={bin.waste_type} size="sm" />
@@ -114,12 +119,15 @@ function BinLedgerRow({ bin, points, last }: { bin: Bin; points: Point[]; last: 
           {bin.bin_id} · {formatDistance(bin.current_distance_cm)}
         </Text>
         <Text style={[t.caption, { color: sensorBad ? c.warning : c.ink3 }]} numberOfLines={1}>
-          {sensorText} · {formatTime(bin.updated_at)}
+          {sensorText}
+          {bin.sensor_status !== null ? ` · ${formatTime(bin.updated_at)}` : ''}
         </Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         <Readout value={r.value} unit={r.unit} />
-        <Text style={[t.label, { color: level === 'normal' ? c.ink2 : level === 'unknown' ? c.ink3 : c.fill[level] }]}>{FILL_LEVEL_LABELS[level]}</Text>
+        <Text style={[t.label, { color: reading.state === 'live' ? (level === 'normal' ? c.ink2 : level === 'unknown' ? c.ink3 : c.fill[level]) : reading.state === 'no_sensor' ? c.ink3 : c.critical }]}>
+          {reading.state === 'live' ? FILL_LEVEL_LABELS[level] : reading.label}
+        </Text>
         <Sparkline points={points} color={c.material[bin.waste_type]} width={64} height={18} maxGapMs={BUCKET_MIN * 60000 * 1.5} />
       </View>
       <Ionicons name="chevron-forward" size={18} color={c.ink3} />

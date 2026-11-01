@@ -15,7 +15,7 @@ import { alertBadgeCount, localMidnightISO } from '../../services/alertsView';
 import { describeError } from '../../services/errors';
 import { useDashboard } from '../../services/DashboardContext';
 import { fillReadout, formatCount, formatRelative, formatTime } from '../../services/format';
-import { FILL_LEVEL_LABELS, WASTE_LABELS, WASTE_TYPES, deriveAlerts, deviceHealth, fillLevel, type Bin, type DetectionSummary } from '../../services/shared';
+import { FILL_LEVEL_LABELS, WASTE_LABELS, WASTE_TYPES, deriveAlerts, deviceHealth, fillLevel, type Bin, type DetectionSummary, binReading } from '../../services/shared';
 import { useNow } from '../../services/useNow';
 import { useTheme } from '../../theme/useTheme';
 
@@ -61,7 +61,7 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <TabHeader
-        title="홈"
+        title="SMART RECYCLE"
         action={
           <Pressable
             accessibilityRole="button"
@@ -166,18 +166,21 @@ function otherCount(s: DetectionSummary): number {
 function BinCell({ bin }: { bin: Bin }) {
   const { c, t, space } = useTheme();
   const router = useRouter();
-  const level = fillLevel(bin.current_fill_percent);
-  const r = fillReadout(bin.current_fill_percent);
-  const sensorBad = bin.sensor_status !== null && bin.sensor_status !== 'normal';
+  // 현재값은 센서 정상일 때만. 미설치·끊김은 숫자 대신 상태 문구 (마지막 값을 현재처럼 보이지 않게)
+  const reading = binReading(bin);
+  const level = fillLevel(reading.percent);
+  const r = fillReadout(reading.percent);
+  const statusText = reading.state === 'live' ? FILL_LEVEL_LABELS[level] : reading.label;
+  const statusColor = reading.state === 'live' ? (level === 'normal' ? c.ink2 : level === 'unknown' ? c.ink3 : c.fill[level]) : reading.state === 'no_sensor' ? c.ink3 : c.critical;
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/bin/[id]', params: { id: bin.bin_id } })}
       accessibilityRole="button"
-      accessibilityLabel={`${WASTE_LABELS[bin.waste_type]}, 적재율 ${r.value === '--' ? '미보정' : `${r.value}%`}, ${FILL_LEVEL_LABELS[level]}. 상세 보기`}
+      accessibilityLabel={`${WASTE_LABELS[bin.waste_type]}, 적재율 ${r.value === '--' ? reading.label : `${r.value}%`}, ${statusText}. 상세 보기`}
       style={({ pressed }) => ({ width: '50%', paddingHorizontal: space.s2, paddingVertical: space.s3, opacity: pressed ? 0.7 : 1 })}
     >
       <View style={{ flexDirection: 'row', gap: space.s3, alignItems: 'flex-end' }}>
-        <MaterialColumn percent={bin.current_fill_percent} type={bin.waste_type} width={36} height={112} />
+        <MaterialColumn percent={reading.percent} type={bin.waste_type} width={36} height={112} />
         <View style={{ flex: 1, gap: space.s1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <MaterialCode type={bin.waste_type} size="sm" />
@@ -186,9 +189,9 @@ function BinCell({ bin }: { bin: Bin }) {
             </Text>
           </View>
           <Readout value={r.value} unit={r.unit} />
-          <Text style={[t.label, { color: level === 'normal' ? c.ink2 : level === 'unknown' ? c.ink3 : c.fill[level] }]} numberOfLines={1}>
-            {FILL_LEVEL_LABELS[level]}
-            {sensorBad ? <Text style={{ color: c.warning }}> · 센서 이상</Text> : null}
+          <Text style={[t.label, { color: statusColor }]} numberOfLines={2}>
+            {statusText}
+            {reading.lastPercent !== null && reading.state !== 'live' ? ` · 마지막 ${reading.lastPercent.toFixed(1)}%` : ''}
           </Text>
         </View>
       </View>

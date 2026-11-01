@@ -5,3 +5,4 @@ export * from './state';
 export * from './labels';
 export * from './health';
 export * from './alerts';
+export * from './bins';

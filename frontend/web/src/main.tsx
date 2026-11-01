@@ -17,6 +17,7 @@ import './styles/pages/bins.css';
 import './styles/pages/devices.css';
 import './styles/pages/operations.css';
 import './styles/pages/sorting.css';
+import './styles/brand.css';
 import { App } from './App';
 
 createRoot(document.getElementById('root')!).render(

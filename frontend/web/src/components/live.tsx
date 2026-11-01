@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 import { HARDWARE_STATUS_LABELS, WASTE_LABELS, detectionImageUrl } from '@shared';
 import type { Detection, EdgeStatus, Telemetry } from '@shared';
 import { config } from '../config';
@@ -41,12 +42,44 @@ export function DetectionImage({ d, className = '' }: { d: Detection; className?
   );
 }
 
-/** 개요 최상단: 가장 최근 인식 결과 */
-export function LiveDetection({ d, now }: { d: Detection | undefined; now: number }) {
-  if (!d) return <EmptyState>아직 인식 결과 없음 — 카메라 노트북에서 쓰레기를 보여주세요</EmptyState>;
-  const label = WASTE_LABELS[d.waste_type as keyof typeof WASTE_LABELS] ?? d.waste_type;
+/** 긴 ID 복사. LAN(http) 에서는 navigator.clipboard 가 없을 수 있어 textarea 방식으로 대체 */
+export function CopyButton({ text, label = '복사' }: { text: string; label?: string }) {
+  const [done, setDone] = useState(false);
+  const copy = async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+      else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setDone(true);
+      setTimeout(() => setDone(false), 1500);
+    } catch {
+      setDone(false);
+    }
+  };
   return (
-    <div className="live" data-testid="live-detection" data-detection-id={d.detection_id ?? ''}>
+    <button type="button" className="copy-btn" onClick={() => void copy()} aria-label={`${label}: ${text}`}>
+      {done ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
+      {done ? '복사됨' : label}
+    </button>
+  );
+}
+
+/** 개요 최상단: 가장 최근 인식 결과. 방금(10초 이내) 도착한 결과는 짧게 강조한다 */
+export function LiveDetection({ d, now }: { d: Detection | undefined; now: number }) {
+  if (!d) return <EmptyState>아직 인식 결과 없음 — 카메라 컴퓨터 앞에 쓰레기를 보여 주세요</EmptyState>;
+  const label = WASTE_LABELS[d.waste_type as keyof typeof WASTE_LABELS] ?? d.waste_type;
+  const fresh = now - Date.parse(d.received_at) < 10_000;
+  return (
+    <div className={`live${fresh ? ' live--new' : ''}`} data-testid="live-detection" data-detection-id={d.detection_id ?? ''}>
       <DetectionImage key={d.id} d={d} className="live__img" />
       <dl className="live__facts">
         <div className="live__type">
@@ -85,7 +118,10 @@ export function LiveDetection({ d, now }: { d: Detection | undefined; now: numbe
         </div>
         <div>
           <dt>Detection ID</dt>
-          <dd className="t-mono live__id">{d.detection_id ?? `#${d.id}`}</dd>
+          <dd className="t-mono live__id">
+            <span>{d.detection_id ?? `#${d.id}`}</span>
+            {d.detection_id && <CopyButton text={d.detection_id} label="ID 복사" />}
+          </dd>
         </div>
         <div>
           <dt>카메라 · 모델</dt>
@@ -184,16 +220,13 @@ export function EdgeStatusPanel({ edges, fullAlert, now }: { edges: EdgeStatus[]
           {e.last_error && <p className="edge__err">{e.last_error}</p>}
         </div>
       ))}
-      <p className="edge__alert">
-        만차 센서(초음파 1개):{' '}
-        {fullAlert ? (
+      {fullAlert && (
+        <p className="edge__alert">
           <StatusText tone="critical">
             만차 감지 {formatTime(fullAlert.measured_at)} ({formatRelative(fullAlert.measured_at, now)})
           </StatusText>
-        ) : (
-          <span className="muted">수신 기록 없음</span>
-        )}
-      </p>
+        </p>
+      )}
     </div>
   );
 }

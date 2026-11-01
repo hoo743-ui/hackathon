@@ -27,7 +27,8 @@ const Ctx = createContext<ThemeCtx | null>(null);
 
 export function AppThemeProvider({ fontsLoaded, children }: { fontsLoaded: boolean; children: React.ReactNode }) {
   const system = useColorScheme();
-  const [preference, setPref] = useState<ThemePreference>('system');
+  // 기본 = 라이트 (웹과 같은 브랜드 화면). 사용자가 설정에서 바꾸면 그 값을 유지
+  const [preference, setPref] = useState<ThemePreference>('light');
   const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {

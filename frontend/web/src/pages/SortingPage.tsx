@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowUpDown } from 'lucide-react';
-import { DETECTION_OUTCOME_LABELS, WASTE_LABELS, WASTE_TYPES, detectionImageUrl } from '@shared';
+import { DETECTION_OUTCOME_LABELS, HARDWARE_STATUS_LABELS, WASTE_LABELS, WASTE_TYPES, detectionImageUrl } from '@shared';
 import type { Detection, DetectionOutcome, DetectionSummary } from '@shared';
 import { useDashboard } from '../data/DashboardContext';
 import { Confidence, DetectionType, OUTCOME_TONE, OutcomeDetail, OutcomeText } from '../components/detections';
@@ -188,7 +188,7 @@ function DetectionTable({ items }: { items: Detection[] }) {
               신뢰도
             </th>
             <th scope="col">처리 결과</th>
-            <th scope="col">연결 명령 · ACK</th>
+            <th scope="col">하드웨어 · 장치 응답</th>
             <th scope="col">출처</th>
             <th scope="col">모델</th>
           </tr>
@@ -218,8 +218,14 @@ function DetectionTable({ items }: { items: Detection[] }) {
                 <OutcomeText outcome={d.outcome} />
               </td>
               <td>
-                {d.command_id ? <span className="t-mono muted">{d.command_id.slice(0, 8)} · </span> : null}
-                {d.outcome_detail ? <OutcomeDetail detail={d.outcome_detail} /> : !d.command_id ? <span className="muted">--</span> : null}
+                {d.hardware_status ? (
+                  <span>{HARDWARE_STATUS_LABELS[d.hardware_status] ?? d.hardware_status}</span>
+                ) : (
+                  <>
+                    {d.command_id ? <span className="t-mono muted">{d.command_id.slice(0, 8)} · </span> : null}
+                    {d.outcome_detail ? <OutcomeDetail detail={d.outcome_detail} /> : !d.command_id ? <span className="muted">--</span> : null}
+                  </>
+                )}
               </td>
               <td className="nowrap">{d.source === 'simulator' ? <span className="origin-tag origin-tag--sim">시뮬레이터</span> : 'AI 모델'}</td>
               <td className="t-mono muted">{d.model_name ?? '--'}</td>
