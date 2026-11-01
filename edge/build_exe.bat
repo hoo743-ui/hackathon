@@ -14,7 +14,7 @@ python -m pip install --upgrade pip || goto :err
 pip install -r requirements.txt pyinstaller || goto :err
 echo [3/4] 빌드 (수 분 소요)
 pyinstaller --noconfirm --clean --windowed --name SMART_RECYCLE_AI ^
-  --collect-all ultralytics --collect-all torchvision --hidden-import start_camera_system ^
+  --collect-all ultralytics --collect-all torchvision --collect-all open_clip --hidden-import start_camera_system ^
   smart_recycle_ai.py || goto :err
 echo [4/4] 설정·모델 복사
 if exist .env (copy /Y .env dist\SMART_RECYCLE_AI\.env >nul) else (copy /Y .env.example dist\SMART_RECYCLE_AI\.env >nul)

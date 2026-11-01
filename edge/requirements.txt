@@ -6,3 +6,5 @@ opencv-python>=4.8
 pyserial>=3.5
 requests>=2.31
 python-dotenv>=1.0
+# 2차 판정기 (CLIP). 처음 실행 시 CLIP 가중치(약 600MB)를 인터넷으로 받아 캐시에 저장
+open_clip_torch>=2.24

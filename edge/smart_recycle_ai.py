@@ -268,7 +268,8 @@ class App:
         if e.yolo:
             self._set("model", OK, f"{e.model_name} · 로드 완료 · {len(e.yolo.names)} classes")
             self._set("infer", OK if e.yolo.camera_verified else WARN,
-                      f"INFERENCE ONLY · {e.yolo.device_label} · {e.fps:.1f} FPS · imgsz {e.yolo.imgsz} · conf {e.yolo.conf}"
+                      f"INFERENCE ONLY · {e.yolo.device_label} · {e.fps:.1f} FPS · conf {e.yolo.conf} · 2차 판정 {e.verifier_status}"
+                      + (f" · 배경 무시 {e.rejected}" if e.rejected else "")
                       + ("" if e.yolo.camera_verified else " · 카메라 프레임 대기"))
         else:
             self._set("model", BAD if self.phase == "failed" else WARN, "로딩 중…" if self.phase == "starting" else e.status_msg)

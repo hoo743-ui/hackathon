@@ -73,6 +73,11 @@ class Settings:
     img_size: int = field(default_factory=lambda: _int("IMG_SIZE", 640))
     confidence_threshold: float = field(default_factory=lambda: _float("CONFIDENCE_THRESHOLD", 0.5))
     send_cooldown: float = field(default_factory=lambda: _float("SEND_COOLDOWN", 2.0))
+    # 2차 판정기 (CLIP + TrashNet): 사람·배경 오인식 차단, 재질 보정
+    verify: bool = field(default_factory=lambda: _bool("VERIFY", True))
+    verify_bg_reject: float = field(default_factory=lambda: _float("VERIFY_BG_REJECT", 0.6))
+    verify_override: float = field(default_factory=lambda: _float("VERIFY_OVERRIDE", 0.7))
+    verify_keep_conf: float = field(default_factory=lambda: _float("VERIFY_KEEP_CONF", 0.85))
     # 같은 클래스가 연속 N프레임 + 최소 시간 동안 검출되어야 1회 처리 (투입 1회 = 분류 1회)
     stable_frames: int = field(default_factory=lambda: _int("STABLE_FRAMES", 4))
     stable_min_sec: float = field(default_factory=lambda: _float("STABLE_MIN_SEC", 0.4))

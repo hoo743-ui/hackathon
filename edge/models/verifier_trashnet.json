@@ -1,0 +1,24 @@
+{
+  "dataset": "TrashNet (garythung/trashnet, dataset-resized)",
+  "images": 2527,
+  "train": 2019,
+  "test": 508,
+  "seed": 0,
+  "zero_shot_acc": 0.7815,
+  "probe_acc": 0.9193,
+  "probe_per_class": {
+    "glass": 0.931,
+    "metal": 0.902,
+    "paper": 0.975,
+    "plastic": 0.835,
+    "other": 0.821
+  },
+  "zero_shot_per_class": {
+    "glass": 0.653,
+    "metal": 0.854,
+    "paper": 0.87,
+    "plastic": 0.825,
+    "other": 0.25
+  },
+  "clip": "ViT-B-32/laion2b_s34b_b79k"
+}

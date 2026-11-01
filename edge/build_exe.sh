@@ -7,7 +7,7 @@ PY="${PYTHON:-python3}"
 .venv/bin/python -m pip install -q --upgrade pip
 .venv/bin/pip install -q -r requirements.txt pyinstaller
 .venv/bin/pyinstaller --noconfirm --clean --name SMART_RECYCLE_AI \
-  --collect-all ultralytics --collect-all torchvision --hidden-import start_camera_system smart_recycle_ai.py
+  --collect-all ultralytics --collect-all torchvision --collect-all open_clip --hidden-import start_camera_system smart_recycle_ai.py
 OUT=dist/SMART_RECYCLE_AI
 if [[ -f .env ]]; then cp .env "$OUT/.env"; else cp .env.example "$OUT/.env"; fi
 cp settings.env "$OUT/settings.env"; mkdir -p "$OUT/models"; [[ -f models/best_model.pt ]] && cp models/best_model.pt "$OUT/models/" || true

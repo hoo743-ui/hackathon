@@ -137,6 +137,9 @@ class EdgeApp:
         self.sorted_ok = 0  # 장치 ACK DONE 확인
         self.sorted_failed = 0  # ACK 타임아웃/거부/중단/전송 실패
         self.model_name = Path(settings.model_path).name
+        self.verifier = None  # 2차 판정기 (백그라운드 로드, 준비 전에는 YOLO 결과만 사용)
+        self.verifier_status = "꺼짐" if not settings.verify else "준비 중"
+        self.rejected = 0  # 2차 판정기가 배경·사람으로 걸러낸 횟수
         self.model_path: Path | None = None
         self.last_event = ""
         self.last_detection: dict | None = None  # GUI 표시용
@@ -252,7 +255,41 @@ class EdgeApp:
             })
 
     # --- 분류 1회 처리 ---
-    def handle(self, det, annotated) -> None:
+    def _load_verifier(self) -> None:
+        try:
+            import torch  # noqa: F401
+            from smartrecycle_edge.verifier import MaterialVerifier
+
+            w = EDGE_DIR / "models" / "verifier_trashnet.npz"
+            if not w.exists():
+                self.verifier_status = "가중치 파일 없음 → YOLO 만 사용"
+                return
+            dev = "cuda" if self.yolo and self.yolo.device not in ("cpu", "mps") else "cpu"
+            self.verifier = MaterialVerifier(w, device=dev)
+            self.verifier_status = "켜짐 (CLIP + TrashNet)"
+        except Exception as exc:
+            self.verifier_status = f"사용 불가 → YOLO 만 사용 ({type(exc).__name__})"
+            log.warning("2차 판정기 로드 실패 (처음 실행 시 인터넷으로 CLIP 가중치를 받습니다): %s", exc)
+
+    def handle(self, det, annotated, frame=None) -> None:
+        if self.verifier is not None and frame is not None:
+            from smartrecycle_edge.verifier import crop_box, decide
+
+            try:
+                v = self.verifier(crop_box(frame, det.box))
+                final, why = decide(det.name, det.confidence, v, bg_reject=settings.verify_bg_reject,
+                                    override_prob=settings.verify_override, keep_conf=settings.verify_keep_conf)
+            except Exception as exc:
+                final, why = det.name.lower(), f"판정기 오류 → YOLO 유지 ({exc})"
+            log.info("[2차 판정] YOLO %s %.2f → %s", det.name, det.confidence, why)
+            if final is None:
+                self.rejected += 1
+                self.last_event = f"무시: {det.name} {det.confidence:.2f} ({why})"
+                return  # 하드웨어 명령·서버 전송 없음
+            if final != det.name.lower():
+                ids = {n.lower(): i for i, n in self.yolo.names.items()}
+                if final in ids:
+                    det.class_id, det.name = ids[final], self.yolo.names[ids[final]]
         signal_char = self.signal_map.get(det.class_id)
         detection_id = str(uuid.uuid4())
         # ① 하드웨어 먼저 (네트워크와 독립). 성공 여부는 ACK 로 나중에 갱신
@@ -271,7 +308,7 @@ class EdgeApp:
             "waste_type": det.name.strip().lower(),
             "class_id": det.class_id,
             "confidence": round(det.confidence, 4),
-            "model_name": self.model_name,
+            "model_name": self.model_name + ("+verify" if self.verifier is not None else ""),
             "captured_at": datetime.now(timezone.utc).isoformat(),
             "bounding_box": dict(zip(("x1", "y1", "x2", "y2"), (round(v, 1) for v in det.box))),
             "hardware_status": hw_status,
@@ -327,6 +364,8 @@ class EdgeApp:
             self.status_msg = str(exc)[:200]
             return 2
         self.yolo = probe
+        if settings.verify:
+            threading.Thread(target=self._load_verifier, name="verifier-load", daemon=True).start()
         log.info("모델 클래스: %s · 대상 class id: %s · 추론 장치: %s · imgsz=%d · conf=%.2f",
                  probe.names, probe.target_ids, probe.device_label, probe.imgsz, probe.conf)
 
@@ -451,8 +490,10 @@ class EdgeApp:
                     continue
                 det = top_detection(result, self.yolo.names)
                 annotated = result.plot()
-                if self.trigger.update(det, can_fire=not self.hw.busy):
-                    self.handle(det, annotated)
+                # 2차 판정기를 켠 경우, 로드가 끝날 때까지(수 초) 분류를 확정하지 않는다 → 검증 없는 결과가 나가지 않게
+                verifying = settings.verify and self.verifier_status == "준비 중"
+                if self.trigger.update(det, can_fire=not self.hw.busy and not verifying):
+                    self.handle(det, annotated, frame)
 
                 now = time.monotonic()
                 self.fps = 0.9 * self.fps + 0.1 * (1.0 / max(now - t_prev, 1e-3))
