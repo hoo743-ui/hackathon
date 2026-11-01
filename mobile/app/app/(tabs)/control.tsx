@@ -14,6 +14,7 @@ import { describeError } from '../../services/errors';
 import { ControlLog, MotorTestRecord } from '../../components/ControlLog';
 import { CONNECTION_LABELS, FINAL_COMMAND_STATUSES, WASTE_TYPES, type CommandStatus, type CommandRequest, type OperatingMode } from '../../services/shared';
 import { useTheme } from '../../theme/useTheme';
+import { useScreenContent } from '../../components/Layout';
 
 const isFinalStatus = (st: CommandStatus) => FINAL_COMMAND_STATUSES.includes(st);
 
@@ -22,6 +23,7 @@ type Confirm = { kind: 'auto' } | { kind: 'reset' } | null;
 export default function ControlScreen() {
   const { dashboard, sendCommand, controlToken } = useDashboard();
   const { c, t, space } = useTheme();
+  const content = useScreenContent();
   const router = useRouter();
   // 장치 1대 전제 (DESIGN_AUDIT F3) — 장치 ID 를 화면에 항상 표시한다.
   const device = dashboard?.devices[0];
@@ -76,7 +78,7 @@ export default function ControlScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: c.bg }}>
         <TabHeader title="제어" />
-        <ScrollView contentContainerStyle={{ padding: space.s4, gap: space.s3 }}>
+        <ScrollView contentContainerStyle={content}>
           <View style={{ borderLeftWidth: 3, borderLeftColor: c.accent, paddingLeft: space.s3, gap: space.s2 }}>
             <Text style={[t.bodyStrong, { color: c.ink }]}>카메라 컴퓨터가 직접 제어하는 구성입니다</Text>
             <Text style={[t.body, { color: c.ink2 }]}>
@@ -108,7 +110,7 @@ export default function ControlScreen() {
           ) : null
         }
       />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: space.s4, paddingBottom: space.s5, gap: space.s5 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={content} keyboardShouldPersistTaps="handled">
         {!device ? <Hint text="장치 정보가 없습니다. 서버 연결을 확인하세요 (홈 ⚙ 설정)." tone="warning" /> : null}
 
         {!hasToken ? (

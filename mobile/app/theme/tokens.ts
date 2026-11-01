@@ -91,6 +91,11 @@ export const colors: Record<Scheme, ColorTokens> = {
 export const space = { s1: 4, s2: 8, s3: 12, s4: 16, s5: 24, s6: 32, s7: 48, s8: 64 } as const;
 /** 반경: 카드 14 · 패널 12 · 버튼 8 · 칩 6 (웹 --r-card/--r-panel/--r-btn/--r-chip 과 동일) */
 export const radius = { none: 0, chip: 6, btn: 8, panel: 12, card: 14, estop: 10 } as const;
+/**
+ * 레이아웃 규격 (모든 화면 공통) — 8pt 그리드
+ * 화면 좌우 16 · 카드 사이 12 · 카드 안쪽 16 · 2열 격자 간격 12 · 타일 안쪽 12 · 목록 행 최소 52
+ */
+export const layout = { screenX: 16, screenTop: 4, screenBottom: 24, cardGap: 12, cardPad: 16, gridGap: 12, tilePad: 12, rowMinH: 52 } as const;
 /** 최소 터치 영역 (pt) */
 export const touchTarget = 44;
 /** 섹션 괘선 두께 */

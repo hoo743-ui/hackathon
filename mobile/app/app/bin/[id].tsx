@@ -22,6 +22,7 @@ import {
   type SensorLog, binReading } from '../../services/shared';
 import { useNow } from '../../services/useNow';
 import { useTheme } from '../../theme/useTheme';
+import { useScreenContent } from '../../components/Layout';
 
 const HISTORY_LIMIT = 200;
 const RECENT_ROWS = 15; // 이후 '더 보기'로 이미 받은 최근 200건까지 펼침
@@ -47,6 +48,7 @@ export default function BinDetailScreen() {
   const { c, t, space } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const content = useScreenContent(insets.bottom);
   const now = useNow(5000);
   const bin = dashboard?.bins.find((b) => b.bin_id === id);
   const device = dashboard?.devices.find((d) => d.device_id === bin?.device_id);
@@ -84,7 +86,7 @@ export default function BinDetailScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: c.bg }}
-      contentContainerStyle={{ padding: space.s4, paddingBottom: space.s6 + insets.bottom, gap: space.s5 }}
+      contentContainerStyle={content}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -110,9 +112,9 @@ export default function BinDetailScreen() {
         dashboard ? <Empty text="수거함 정보를 찾을 수 없습니다." /> : <Loading />
       ) : (
         <>
-          {/* 판독 영역: 큰 컬럼 + readout-xl */}
-          <View style={{ flexDirection: 'row', gap: space.s4, alignItems: 'flex-end' }}>
-            <MaterialColumn percent={reading?.percent ?? null} type={bin.waste_type} width={72} height={216} tickLabels />
+          {/* 판독 영역: 큰 컬럼 + readout-xl (다른 카드와 같은 규격) */}
+          <View style={{ flexDirection: 'row', gap: space.s4, alignItems: 'flex-end', backgroundColor: c.surface, borderWidth: 1, borderColor: c.rule, borderRadius: 14, padding: 16 }}>
+            <MaterialColumn percent={reading?.percent ?? null} type={bin.waste_type} width={56} height={176} tickLabels />
             <View style={{ flex: 1, gap: space.s2, minWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
                 <MaterialCode type={bin.waste_type} size="lg" />
@@ -148,7 +150,15 @@ export default function BinDetailScreen() {
             {calibration ? (
               <CalibrationScale cal={calibration} distance={bin.current_distance_cm} />
             ) : (
-              <Empty text={bin.calibrated ? '보정값을 불러오지 못했습니다.' : '미보정 — 설정 화면에서 빈 통·가득 기준 거리를 입력하세요.'} />
+              <Empty
+                text={
+                  bin.calibrated
+                    ? '보정값을 불러오지 못했습니다.'
+                    : bin.current_fill_percent !== null
+                      ? '카메라 컴퓨터의 빈 통 거리(EMPTY_DISTANCE_CM)로 적재율을 계산하고 있습니다.'
+                      : '미보정 — 빈 통 거리를 설정하면 적재율이 표시됩니다.'
+                }
+              />
             )}
           </Section>
 

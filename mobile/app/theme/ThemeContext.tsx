@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { AccessibilityInfo, useColorScheme } from 'react-native';
 import { loadPref, savePref } from '../services/prefsStore';
-import { colors, makeTypography, motion, radius, ruleWidth, space, type Scheme } from './tokens';
+import { colors, layout, makeTypography, motion, radius, ruleWidth, space, type Scheme } from './tokens';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 const PREF_KEY = 'theme_preference';
@@ -12,7 +12,7 @@ export function resolveScheme(pref: ThemePreference, system: string | null | und
 }
 
 function buildTheme(scheme: Scheme, fontsLoaded: boolean, reduceMotion: boolean) {
-  return { scheme, c: colors[scheme], t: makeTypography(fontsLoaded), space, radius, ruleWidth, motion, reduceMotion } as const;
+  return { scheme, c: colors[scheme], t: makeTypography(fontsLoaded), space, radius, layout, ruleWidth, motion, reduceMotion } as const;
 }
 
 export type Theme = ReturnType<typeof buildTheme>;

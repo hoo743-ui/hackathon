@@ -8,6 +8,7 @@ import { useDashboard } from '../../services/DashboardContext';
 import { deriveAlerts, type AlertSeverity } from '../../services/shared';
 import { useNow } from '../../services/useNow';
 import { useTheme } from '../../theme/useTheme';
+import { useScreenContent } from '../../components/Layout';
 
 const SECTIONS: { severity: AlertSeverity; title: string }[] = [
   { severity: 'critical', title: '위험' },
@@ -19,6 +20,7 @@ const SECTIONS: { severity: AlertSeverity; title: string }[] = [
 export default function AlertsScreen() {
   const { dashboard, loading, error, refresh } = useDashboard();
   const { c, t, space } = useTheme();
+  const content = useScreenContent();
   const now = useNow(5000);
   const [refreshing, setRefreshing] = useState(false);
   const alerts = deriveAlerts(dashboard, now);
@@ -37,7 +39,7 @@ export default function AlertsScreen() {
         }
       />
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: space.s4, paddingBottom: space.s6, gap: space.s5 }}
+        contentContainerStyle={content}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

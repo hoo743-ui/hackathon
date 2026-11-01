@@ -38,7 +38,7 @@ export function Section({
   style?: StyleProp<ViewStyle>;
   gap?: number;
 }) {
-  const { c, t, space, radius } = useTheme();
+  const { c, t, space, radius, layout } = useTheme();
   return (
     <View
       style={[
@@ -47,13 +47,13 @@ export function Section({
           borderWidth: 1,
           borderColor: c.rule,
           borderRadius: radius.card,
-          padding: space.s4,
-          gap: gap ?? space.s2,
+          padding: layout.cardPad,
+          gap: gap ?? space.s3,
         },
         style,
       ]}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s3, minHeight: 28 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s3, minHeight: 24 }}>
         <Text accessibilityRole="header" style={[t.section, { color: c.ink, flexShrink: 1 }]}>
           {title}
         </Text>

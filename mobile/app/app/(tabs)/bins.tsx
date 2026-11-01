@@ -13,6 +13,7 @@ import { useDashboard } from '../../services/DashboardContext';
 import { fillReadout, formatDistance, formatTime } from '../../services/format';
 import { FILL_LEVEL_LABELS, SENSOR_STATUS_LABELS, WASTE_LABELS, fillLevel, type Bin, type Trend, binReading } from '../../services/shared';
 import { useTheme } from '../../theme/useTheme';
+import { useScreenContent } from '../../components/Layout';
 
 const TREND_HOURS = 24;
 const BUCKET_MIN = 60;
@@ -20,6 +21,7 @@ const BUCKET_MIN = 60;
 export default function BinsScreen() {
   const { dashboard, loading, error, refresh, api } = useDashboard();
   const { c, t, space } = useTheme();
+  const content = useScreenContent();
   const [trend, setTrend] = useState<Trend | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -66,7 +68,7 @@ export default function BinsScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <TabHeader title="수거함" />
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: space.s4, paddingBottom: space.s6, gap: space.s4 }}
+        contentContainerStyle={content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.ink2} />}
       >
         {error ? <ErrorNotice message={error} onRetry={refresh} /> : null}

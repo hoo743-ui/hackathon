@@ -27,11 +27,13 @@ import {
 import { useThemeContext, type ThemePreference } from '../theme/ThemeContext';
 import { touchTarget } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
+import { useScreenContent } from '../components/Layout';
 
 export default function SettingsScreen() {
   const { api, wsState, dashboard, lastRefreshAt, lastEventAt, refresh, controlToken, setControlToken } = useDashboard();
   const { c, t, space } = useTheme();
   const insets = useSafeAreaInsets();
+  const content = useScreenContent(insets.bottom + 24);
   const router = useRouter();
   const { preference, setPreference } = useThemeContext();
   const [health, setHealth] = useState<Health | null>(null);
@@ -76,7 +78,7 @@ export default function SettingsScreen() {
         }}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: space.s4, paddingTop: space.s3, paddingBottom: space.s7 + insets.bottom, gap: space.s6 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={content} keyboardShouldPersistTaps="handled">
           {isSimulated(dashboard, health) ? (
             <View style={{ alignSelf: 'flex-start' }}>
               <DataSourceTag simulated />
