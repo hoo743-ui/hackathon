@@ -109,8 +109,9 @@ time {
   box-shadow: var(--shadow-card);
 }
 .section__title {
-  font-size: 18px;
+  font-size: 16px;
   line-height: 24px;
+  font-weight: 700;
   color: var(--ink);
 }
 .section .section {
@@ -273,4 +274,30 @@ textarea {
 .table-wrap .table th:last-child,
 .table-wrap .table td:last-child {
   padding-right: var(--s4);
+}
+
+/* ---------- 타이포 (Pretendard) ---------- */
+body {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+.page-head h1,
+.page-head__main h1 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.readout__value {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+/* 고정폭 대신 같은 글꼴 + 숫자 정렬 (ID·시각) */
+.t-mono {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.live__id span {
+  font-size: 12px;
+  color: var(--ink-2);
 }

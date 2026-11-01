@@ -29,8 +29,8 @@
 }
 .fill-cell__val {
   min-width: 3.2ch;
-  font-size: 20px;
-  line-height: 24px;
+  font-size: 17px;
+  line-height: 22px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }

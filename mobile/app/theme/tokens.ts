@@ -100,27 +100,26 @@ export const motion = { fill: 240, status: 150, step: 150, hold: 600 } as const;
 
 /** 번들 폰트 패밀리 이름 (expo-font 로 등록되는 키와 동일) */
 export const FONT_FAMILIES = {
-  sans400: 'IBMPlexSansKR_400Regular',
-  sans500: 'IBMPlexSansKR_500Medium',
-  sans600: 'IBMPlexSansKR_600SemiBold',
-  mono400: 'IBMPlexMono_400Regular',
-  mono500: 'IBMPlexMono_500Medium',
+  sans400: 'Pretendard-Regular',
+  sans500: 'Pretendard-Medium',
+  sans600: 'Pretendard-SemiBold',
+  sans700: 'Pretendard-Bold',
 } as const;
 
 const tabular: TextStyle = { fontVariant: ['tabular-nums'] };
 const systemMono = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'ui-monospace, Menlo, monospace' });
 
-type Weight = 400 | 500 | 600;
+type Weight = 400 | 500 | 600 | 700;
 /**
  * 폰트 지정. 번들 폰트가 로드되면 굵기별 패밀리를 쓰고 fontWeight 는 지정하지 않는다
  * (웹에서 단일 굵기 face 에 fontWeight 를 주면 가짜 굵게가 합성됨). 로드 실패/지연 시 시스템 폰트 + fontWeight.
  */
-function face(loaded: boolean, weight: Weight, mono = false): TextStyle {
-  if (mono) {
-    if (loaded) return { fontFamily: weight >= 500 ? FONT_FAMILIES.mono500 : FONT_FAMILIES.mono400 };
-    return { fontFamily: systemMono, fontWeight: weight >= 500 ? '500' : '400' };
+function face(loaded: boolean, weight: Weight, _mono = false): TextStyle {
+  // 숫자·ID·시각도 고정폭 대신 같은 글꼴 + tabular-nums (상용 앱 방식). _mono 는 호출부 호환용
+  if (loaded) {
+    const fam = { 400: FONT_FAMILIES.sans400, 500: FONT_FAMILIES.sans500, 600: FONT_FAMILIES.sans600, 700: FONT_FAMILIES.sans700 }[weight];
+    return { fontFamily: fam };
   }
-  if (loaded) return { fontFamily: weight === 600 ? FONT_FAMILIES.sans600 : weight === 500 ? FONT_FAMILIES.sans500 : FONT_FAMILIES.sans400 };
   return { fontWeight: String(weight) as TextStyle['fontWeight'] };
 }
 
@@ -128,20 +127,21 @@ function face(loaded: boolean, weight: Weight, mono = false): TextStyle {
 export function makeTypography(fontsLoaded: boolean) {
   const f = (w: Weight, mono = false) => face(fontsLoaded, w, mono);
   return {
-    display: { fontSize: 32, lineHeight: 36, letterSpacing: -0.6, ...f(600) },
-    readoutXl: { fontSize: 48, lineHeight: 52, letterSpacing: -1, ...f(500), ...tabular },
-    readout: { fontSize: 28, lineHeight: 32, letterSpacing: -0.4, ...f(500), ...tabular },
-    title: { fontSize: 22, lineHeight: 28, ...f(600) },
-    /** 섹션 머리 (ledger rule 아래) */
-    section: { fontSize: 17, lineHeight: 24, ...f(600) },
-    body: { fontSize: 15, lineHeight: 22, ...f(400) },
-    bodyStrong: { fontSize: 15, lineHeight: 22, ...f(500) },
+    // 상용 앱 기준 크기 (Pretendard): 화면 제목 22 · 섹션 16 · 본문 14 · 라벨 13 · 캡션 12
+    display: { fontSize: 22, lineHeight: 30, letterSpacing: -0.4, ...f(700) },
+    readoutXl: { fontSize: 36, lineHeight: 42, letterSpacing: -0.8, ...f(700), ...tabular },
+    readout: { fontSize: 22, lineHeight: 28, letterSpacing: -0.4, ...f(700), ...tabular },
+    title: { fontSize: 18, lineHeight: 26, letterSpacing: -0.3, ...f(700) },
+    /** 카드 제목 */
+    section: { fontSize: 16, lineHeight: 22, letterSpacing: -0.2, ...f(700) },
+    body: { fontSize: 14, lineHeight: 21, letterSpacing: -0.1, ...f(400) },
+    bodyStrong: { fontSize: 14, lineHeight: 21, letterSpacing: -0.1, ...f(600) },
     label: { fontSize: 13, lineHeight: 18, ...f(500) },
     caption: { fontSize: 12, lineHeight: 16, ...f(400) },
-    mono: { fontSize: 13, lineHeight: 18, ...f(400, true), ...tabular },
-    monoStrong: { fontSize: 13, lineHeight: 18, ...f(500, true), ...tabular },
+    mono: { fontSize: 12, lineHeight: 17, ...f(400, true), ...tabular },
+    monoStrong: { fontSize: 13, lineHeight: 18, ...f(600, true), ...tabular },
     /** 판독값 단위 (%·cm) */
-    unit: { fontSize: 15, lineHeight: 20, ...f(500) },
+    unit: { fontSize: 13, lineHeight: 18, ...f(500) },
     tabular,
   } satisfies Record<string, TextStyle>;
 }

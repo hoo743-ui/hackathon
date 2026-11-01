@@ -1,8 +1,3 @@
-import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono/400Regular';
-import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono/500Medium';
-import { IBMPlexSansKR_400Regular } from '@expo-google-fonts/ibm-plex-sans-kr/400Regular';
-import { IBMPlexSansKR_500Medium } from '@expo-google-fonts/ibm-plex-sans-kr/500Medium';
-import { IBMPlexSansKR_600SemiBold } from '@expo-google-fonts/ibm-plex-sans-kr/600SemiBold';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -20,11 +15,11 @@ const FONT_WAIT_MS = 1200;
 export default function RootLayout() {
   // 앱에 번들된 폰트 파일만 사용 (런타임 네트워크 없음). 실제로 쓰는 굵기만 로드.
   const [loaded, error] = useFonts({
-    [FONT_FAMILIES.sans400]: IBMPlexSansKR_400Regular,
-    [FONT_FAMILIES.sans500]: IBMPlexSansKR_500Medium,
-    [FONT_FAMILIES.sans600]: IBMPlexSansKR_600SemiBold,
-    [FONT_FAMILIES.mono400]: IBMPlexMono_400Regular,
-    [FONT_FAMILIES.mono500]: IBMPlexMono_500Medium,
+    // Pretendard (SIL OFL) — 웹과 같은 글꼴. 앱에 포함되어 오프라인에서도 동일
+    [FONT_FAMILIES.sans400]: require('../assets/fonts/Pretendard-Regular.otf'),
+    [FONT_FAMILIES.sans500]: require('../assets/fonts/Pretendard-Medium.otf'),
+    [FONT_FAMILIES.sans600]: require('../assets/fonts/Pretendard-SemiBold.otf'),
+    [FONT_FAMILIES.sans700]: require('../assets/fonts/Pretendard-Bold.otf'),
   });
   const [waited, setWaited] = useState(false);
   useEffect(() => {

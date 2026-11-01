@@ -34,8 +34,8 @@ export function LiveDetection({ d, now }: { d: Detection; now: number }) {
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s3, flexWrap: 'wrap' }}>
         {material ? <MaterialCode type={material} /> : null}
-        <Text style={{ fontSize: 30, fontWeight: '700', color: c.ink }}>{material ? WASTE_LABELS[material] : d.waste_type}</Text>
-        <Text style={[t.monoStrong, { fontSize: 24, color: c.ink }]}>{formatConfidence(d.confidence)}</Text>
+        <Text style={[t.display, { fontSize: 24, lineHeight: 30, color: c.ink }]}>{material ? WASTE_LABELS[material] : d.waste_type}</Text>
+        <Text style={[t.readout, { color: c.ink }]}>{formatConfidence(d.confidence)}</Text>
       </View>
       <Text style={[t.label, { color: c.ink2 }]}>
         촬영 {formatTime(d.captured_at ?? d.detected_at)} · {formatRelative(d.received_at, now)} · {d.camera_id ?? '--'}

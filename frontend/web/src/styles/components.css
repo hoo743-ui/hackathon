@@ -437,11 +437,11 @@
   letter-spacing: -0.03em;
 }
 .readout--xl .readout__unit {
-  font-size: 22px;
+  font-size: 18px;
 }
 .readout--sm .readout__value {
-  font-size: 20px;
-  line-height: 24px;
+  font-size: 18px;
+  line-height: 22px;
 }
 .readout--sm .readout__unit {
   font-size: 12px;

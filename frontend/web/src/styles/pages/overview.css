@@ -109,8 +109,8 @@
   gap: var(--s1) var(--s3);
 }
 .bincell .readout__value {
-  font-size: 40px;
-  line-height: 44px;
+  font-size: 30px;
+  line-height: 36px;
 }
 .bincell__level {
   font-size: var(--fs-label);
@@ -210,8 +210,8 @@
     --h: 140px;
   }
   .bincell .readout__value {
-    font-size: 32px;
-    line-height: 36px;
+    font-size: 26px;
+    line-height: 32px;
   }
 }
 
@@ -270,8 +270,8 @@
 .live__facts { display: grid; gap: 10px; margin: 0; }
 .live__facts dt { font-size: 12px; color: var(--ink-3); }
 .live__facts dd { margin: 2px 0 0; }
-.live__label { font-size: 34px; font-weight: 700; line-height: 1.1; }
-.live__conf .conf { font-size: 26px; font-weight: 600; }
+.live__label { font-size: 26px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+.live__conf .conf { font-size: 22px; font-weight: 600; }
 .live__id { font-size: 12px; word-break: break-all; }
 .detimg {
   position: relative;
@@ -303,7 +303,7 @@
 .edge__alert { margin: 0; font-size: 13px; }
 @media (max-width: 760px) {
   .live { grid-template-columns: 1fr; }
-  .live__label { font-size: 28px; }
+  .live__label { font-size: 22px; }
 }
 .ov-live__main { grid-column: span 8; }
 .ov-live__edge { grid-column: span 4; }

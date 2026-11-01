@@ -52,19 +52,21 @@
     transparent 2px 7px
   );
 
-  /* 타이포 */
-  --font-sans: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* 타이포 — Pretendard (상용 앱 기준 크기: 본문 14 · 라벨 13 · 캡션 12 · 섹션 16~18 · 페이지 24)
+     숫자·시각·ID 는 고정폭 대신 같은 글꼴 + tabular-nums 로 정렬한다 */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo',
+    'Malgun Gothic', 'Noto Sans KR', sans-serif;
+  --font-mono: var(--font-sans);
 
-  --fs-display: 40px;
-  --lh-display: 44px;
-  --fs-readout-xl: 64px;
-  --fs-readout: 28px;
-  --lh-readout: 32px;
-  --fs-title: 22px;
-  --lh-title: 28px;
-  --fs-body: 15px;
-  --lh-body: 22px;
+  --fs-display: 26px;
+  --lh-display: 34px;
+  --fs-readout-xl: 44px;
+  --fs-readout: 24px;
+  --lh-readout: 30px;
+  --fs-title: 18px;
+  --lh-title: 26px;
+  --fs-body: 14px;
+  --lh-body: 21px;
   --fs-label: 13px;
   --lh-label: 18px;
   --fs-caption: 12px;
@@ -192,9 +194,9 @@
   :root {
     --page-pad: 16px;
     --gutter: 12px;
-    --fs-display: 32px;
-    --lh-display: 36px;
-    --fs-readout-xl: 48px;
+    --fs-display: 22px;
+    --lh-display: 30px;
+    --fs-readout-xl: 36px;
   }
 }
 

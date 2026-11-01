@@ -51,8 +51,8 @@
   gap: var(--s1);
 }
 .sum__num {
-  font-size: 40px;
-  line-height: 44px;
+  font-size: 30px;
+  line-height: 36px;
   font-weight: 500;
   letter-spacing: -0.02em;
 }
