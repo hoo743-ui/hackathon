@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     edge_sensor_bin_id: str = ""
     # 카메라 노트북 heartbeat가 이 시간 동안 없으면 offline
     edge_offline_after_sec: float = 15
+    # 서버 자동 탐색 신호 (카메라 컴퓨터가 IP 변경을 자동으로 따라감)
+    discovery_enabled: bool = True
+    discovery_port: int = 50505
+    discovery_interval_sec: float = 2.0
+    api_port: int = 8000
     # 분류 이미지 저장 위치 (backend/ 기준 상대경로 또는 절대경로)
     upload_dir: str = "data/images"
     max_image_bytes: int = 5 * 1024 * 1024

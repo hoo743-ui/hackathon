@@ -26,6 +26,7 @@ import requests
 from smartrecycle_edge.config import EDGE_DIR, resolve_model_path, settings
 from smartrecycle_edge.detector import ModelLoadError, StableTrigger, YoloRunner, top_detection
 from smartrecycle_edge.hardware import LEGACY_ID_TO_SIGNAL, NAME_TO_SIGNAL, HardwareController, SensorMonitor, SerialLink
+from smartrecycle_edge.discovery import Discovery
 from smartrecycle_edge.uploader import Uploader
 
 VERSION = "1.1.0"
@@ -105,7 +106,9 @@ class Heartbeat(threading.Thread):
             if body["last_error"]:
                 body["last_error"] = body["last_error"][:300]
             try:
-                r = self.http.post(f"{settings.backend_url}/api/edge/heartbeat", json=body, timeout=settings.http_timeout)
+                if not a.backend_url.startswith("http"):
+                    raise requests.ConnectionError("서버 주소 미확정 (서버 신호 대기 중)")
+                r = self.http.post(f"{a.backend_url}/api/edge/heartbeat", json=body, timeout=settings.http_timeout)
                 online = r.ok
                 if not r.ok:
                     log.warning("heartbeat 거부: HTTP %s %s", r.status_code, r.text[:120])
@@ -113,8 +116,10 @@ class Heartbeat(threading.Thread):
                 online = False
                 if self.was_online:
                     log.warning("백엔드 연결 끊김: %s", exc)
+            if not online and a.switch_to_discovered():
+                continue  # 새 주소로 바로 다시 시도
             if online and not self.was_online:
-                log.info("백엔드 연결됨: %s", settings.backend_url)
+                log.info("백엔드 연결됨: %s", a.backend_url)
                 a.uploader.flush_outbox()  # 네트워크 복구 → 못 보낸 분류 재전송
             self.was_online = online
             a.backend_online = online
@@ -139,7 +144,9 @@ class EdgeApp:
         self.restart_camera = threading.Event()
         self.status_msg = "준비 중"
         self.stop = threading.Event()
-        self.uploader = Uploader(settings.backend_url, settings.ai_api_token, settings.http_timeout,
+        self.backend_url = settings.backend_url if settings.backend_url.lower() != "auto" else ""
+        self.discovery = Discovery(settings.discovery_port) if settings.discovery else None
+        self.uploader = Uploader(self.backend_url, settings.ai_api_token, settings.http_timeout,
                                  settings.upload_max_attempts, settings.outbox_dir, settings.outbox_max_files)
         hw_enabled = settings.hw_enabled and not args.no_hw
         self.hw = HardwareController(hw_enabled, settings.hw_serial_port, settings.hw_baud, settings.hw_busy_sec,
@@ -340,11 +347,33 @@ class EdgeApp:
         self.status_msg = "카메라 모드"
         return 0
 
+    def switch_to_discovered(self) -> bool:
+        """서버 신호로 받은 주소가 지금 주소와 다르면 바꾸고 .env 에 저장한다 (다음 실행에도 사용)."""
+        if not self.discovery:
+            return False
+        url = self.discovery.fresh_url()
+        if not url or url == self.backend_url:
+            return False
+        old = self.backend_url or "(미설정)"
+        self.backend_url = url
+        self.uploader.base = url
+        log.warning("서버 주소 자동 변경: %s → %s (서버 신호)", old, url)
+        try:
+            from smartrecycle_edge.config import save_env
+
+            save_env({"BACKEND_URL": url})
+        except Exception:
+            log.exception(".env 저장 실패 (이번 실행에는 새 주소 사용)")
+        self.uploader.flush_outbox()
+        return True
+
     def start_background(self) -> None:
         """전송 큐 · 하드웨어 시리얼 · ESP32 · heartbeat · 주기 작업 (한 번만)."""
         if getattr(self, "_bg_started", False):
             return
         self._bg_started = True
+        if self.discovery:
+            self.discovery.start()
         if settings.backend_url:
             self.uploader.start()
             self.heartbeat.start()

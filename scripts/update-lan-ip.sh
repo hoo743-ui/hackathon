@@ -13,10 +13,11 @@ ENV="$ROOT/.env"
 NEW="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
 [[ -z "$NEW" ]] && { echo "⚠️  LAN IP를 찾지 못했습니다 (Wi-Fi/핫스팟 연결 확인)"; exit 0; }
 PORT="$(grep -E '^API_PORT=' "$ENV" 2>/dev/null | cut -d= -f2)"; PORT="${PORT:-8000}"
-CUR="$(grep '^EXPO_PUBLIC_API_BASE_URL=' "$ENV" | sed -E 's#^[^/]*//([^:/]+).*#\1#')"
-if [[ ! "$CUR" =~ ^[0-9.]+$ && "$CUR" != "localhost" ]]; then exit 0; fi   # 도메인이면 유지
+CUR="$(grep '^EXPO_PUBLIC_API_BASE_URL=' "$ENV" | sed -E 's#^EXPO_PUBLIC_API_BASE_URL=##; s#^[a-z]+://([^:/]+).*#\1#')"
 CHANGED=0
-if [[ "$CUR" != "$NEW" ]]; then
+# auto(기본): 앱이 Expo 개발 서버 주소에서 서버 IP 를 스스로 찾는다 → .env 수정 불필요
+# 도메인(운영)이면 건드리지 않는다
+if [[ "$CUR" =~ ^[0-9.]+$ || "$CUR" == "localhost" ]] && [[ "$CUR" != "$NEW" ]]; then
   sed -i '' -E "s#^(EXPO_PUBLIC_(API_BASE_URL|WS_URL)=[a-z]+://)[^:/]+#\1${NEW}#" "$ENV"
   # CORS_ORIGINS 의 이전 IP 항목 교체, 없으면 추가
   if grep -q "http://${CUR}:5173" "$ENV"; then

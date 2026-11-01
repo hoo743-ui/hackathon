@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.core.errors import APIError, api_error_handler, validation_error_handler
 from app.database.session import SessionLocal
 from app.hardware.device_manager import create_adapter
-from app.services import command_service, edge_service, telemetry_service
+from app.services import command_service, discovery, edge_service, telemetry_service
 from app.websocket.routes import router as ws_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -39,10 +39,13 @@ async def lifespan(app: FastAPI):
     app.state.hardware = hardware
     logger.info("HARDWARE_MODE=%s", hardware.mode)
     supervisor = asyncio.create_task(supervisor_loop())
+    beacon = asyncio.create_task(discovery.beacon_loop()) if settings.discovery_enabled else None
     if settings.mqtt_enabled:
         await hardware.start()
     yield
     await hardware.disconnect()
+    if beacon:
+        beacon.cancel()
     supervisor.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await supervisor

@@ -237,7 +237,9 @@ class App:
     def _tick(self) -> None:
         e = self.edge
         probs = settings.problems()
-        self._set("config", BAD if probs else OK, "; ".join(probs) or f"{settings.device_id} → {settings.backend_url}")
+        disc = e.discovery
+        disc_txt = "" if not disc else (" · 자동 탐색 " + ("수신 중" if disc.fresh_url() else ("오류: " + disc.error if disc.error else "신호 대기")))
+        self._set("config", BAD if probs else OK, "; ".join(probs) or f"{settings.device_id} → {e.backend_url or '서버 찾는 중'}{disc_txt}")
         if e.yolo:
             self._set("model", OK, f"{e.model_name} · 로드 완료 · {len(e.yolo.names)} classes")
             self._set("infer", OK if e.yolo.camera_verified else WARN,
@@ -283,7 +285,7 @@ class App:
             self._set("esp32", OFF, "사용 안 함 (설정에서 ESP32 포트 지정)")
         st = e.uploader.stats
         self._set("server", OK if e.backend_online else BAD,
-                  f"연결됨 · 성공 {st.ok} / 실패 {st.failed}" if e.backend_online else f"연결 안 됨 · {(st.last_error or settings.backend_url)[:120]}")
+                  f"{e.backend_url} · 성공 {st.ok} / 실패 {st.failed}" if e.backend_online else f"연결 안 됨 · {(st.last_error or e.backend_url or '서버 신호 대기')[:120]}")
         q = e.uploader.pending
         self._set("queue", OK if q == 0 else WARN, f"{q}건" + (" (서버 복구 시 자동 재전송)" if q else ""))
 
@@ -329,7 +331,7 @@ class SettingsDialog:
     """Windows 현장 설정: 서버 IP · COM 포트(자동/수동) · 카메라 · 모델 경로 · 센서. 저장 → .env → 재시작."""
 
     FIELDS = [
-        ("BACKEND_URL", "맥북 서버 주소 (http://<맥북 LAN IP>:8000)"),
+        ("BACKEND_URL", "맥북 서버 주소 (http://<IP>:8000 · auto=자동 탐색)"),
         ("AI_API_TOKEN", "AI_API_TOKEN (맥북 .env 와 동일)"),
         ("CAMERA_INDEX", "카메라 번호"),
         ("HW_SERIAL_PORT", "Arduino UNO 포트 (auto 또는 COMx)"),
@@ -406,8 +408,8 @@ class SettingsDialog:
 
         values = {k: v.get().strip() for k, v in self.vars.items()}
         url = values["BACKEND_URL"]
-        if not url.startswith("http://") or "localhost" in url or "127.0.0.1" in url:
-            messagebox.showerror("설정", "서버 주소는 http://<맥북 LAN IP>:8000 형식이어야 합니다 (localhost 금지).", parent=self.win)
+        if url.lower() != "auto" and (not url.startswith("http://") or "localhost" in url or "127.0.0.1" in url):
+            messagebox.showerror("설정", "서버 주소는 http://<맥북 LAN IP>:8000 또는 auto 여야 합니다 (localhost 금지).", parent=self.win)
             return
         if values["EMPTY_DISTANCE_CM"]:
             try:

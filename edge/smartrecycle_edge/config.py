@@ -44,6 +44,9 @@ class Settings:
     # --- 서버 (맥북) ---
     backend_url: str = field(default_factory=lambda: _str("BACKEND_URL").rstrip("/"))
     ai_api_token: str = field(default_factory=lambda: _str("AI_API_TOKEN"))
+    # 서버 자동 탐색: 서버 신호(UDP)를 듣고 맥북 IP 가 바뀌면 자동으로 접속 주소를 바꾼다
+    discovery: bool = field(default_factory=lambda: _bool("DISCOVERY", True))
+    discovery_port: int = field(default_factory=lambda: _int("DISCOVERY_PORT", 50505))
     device_id: str = field(default_factory=lambda: _str("DEVICE_ID", "CAMERA_001"))
     http_timeout: float = field(default_factory=lambda: _float("HTTP_TIMEOUT_SEC", 5.0))
     upload_max_attempts: int = field(default_factory=lambda: _int("UPLOAD_MAX_ATTEMPTS", 5))
@@ -94,7 +97,9 @@ class Settings:
     def problems(self) -> list[str]:
         out = []
         if not self.backend_url:
-            out.append("BACKEND_URL 미설정 (예: http://<맥북 LAN IP>:8000)")
+            out.append("BACKEND_URL 미설정 (예: http://<맥북 LAN IP>:8000 또는 auto)")
+        elif self.backend_url.lower() == "auto":
+            pass  # 서버 신호로 자동 결정
         elif "localhost" in self.backend_url or "127.0.0.1" in self.backend_url:
             out.append("BACKEND_URL 이 localhost 입니다 — 카메라 노트북에서는 맥북의 LAN IP를 써야 합니다")
         if not self.ai_api_token:
