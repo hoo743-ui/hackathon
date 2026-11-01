@@ -144,4 +144,21 @@ def save_env(values: dict[str, str]) -> None:
     ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def acquire_single_instance(port: int = 50506):
+    """카메라 프로그램을 한 번만 실행 (두 개가 같은 COM 포트를 두고 다투는 것을 막는다).
+    이미 실행 중이면 None. 반환한 소켓은 프로그램이 끝날 때까지 들고 있어야 한다."""
+    import socket
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if os.name == "nt":
+        s.setsockopt(socket.SOL_SOCKET, getattr(socket, "SO_EXCLUSIVEADDRUSE", 0x0004), 1)
+    try:
+        s.bind(("127.0.0.1", port))
+        s.listen(1)
+        return s
+    except OSError:
+        s.close()
+        return None
+
+
 settings = Settings()

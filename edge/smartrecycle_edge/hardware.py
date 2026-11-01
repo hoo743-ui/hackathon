@@ -80,7 +80,9 @@ class SerialLink:
                     ser = serial.Serial(self.port, self.baud, **kwargs)
         except Exception as exc:  # SerialException, PermissionError …
             msg = str(exc)
-            hint = " — 다른 프로그램(Arduino IDE 시리얼 모니터 등)이 사용 중" if ("denied" in msg or "busy" in msg.lower()) else ""
+            busy = any(w in msg for w in ("denied", "거부", "PermissionError", "busy", "Busy"))
+            hint = (" — 다른 프로그램이 포트를 사용 중: Arduino IDE 시리얼 모니터를 닫거나, 이 프로그램이 두 번 켜져 있는지 확인"
+                    if busy else "")
             self.last_error = f"{self.port} 열기 실패: {msg}{hint}"
             log.warning("[%s] %s", self.name, self.last_error)
             return False
@@ -127,13 +129,17 @@ class SerialLink:
         while not self._stop.is_set():
             ser = self._ser
             if ser is None:
-                if not self.port or self._reconnects >= self.max_reconnects:
+                if not self.port:
                     time.sleep(1)
                     continue
-                time.sleep(3)  # 재연결 간격 (최대 max_reconnects 회)
+                # 처음 max_reconnects 회는 3초 간격, 그 뒤에는 10초 간격으로 계속 시도한다
+                # (포트를 잡고 있던 프로그램을 닫거나 케이블을 다시 꽂으면 손대지 않아도 자동 복구)
+                slow = self._reconnects >= self.max_reconnects
+                if self.stop_wait(10 if slow else 3):
+                    break
                 self._reconnects += 1
-                if not self.open() and self._reconnects >= self.max_reconnects:
-                    log.error("[%s] 재연결 %d회 실패 → 중단 ('연결 재확인' 버튼으로 다시 시도)", self.name, self.max_reconnects)
+                if not self.open() and self._reconnects == self.max_reconnects:
+                    log.warning("[%s] 재연결 %d회 실패 → 10초 간격으로 계속 시도 (%s)", self.name, self.max_reconnects, self.last_error)
                 continue
             try:
                 chunk = ser.readline()
@@ -156,6 +162,9 @@ class SerialLink:
                     self.on_line(self.name, line)
                 except Exception:
                     log.exception("line handler error")
+
+    def stop_wait(self, sec: float) -> bool:
+        return self._stop.wait(sec)
 
     def retry(self) -> None:
         self._reconnects = 0

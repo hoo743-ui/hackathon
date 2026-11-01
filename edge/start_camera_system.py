@@ -493,6 +493,12 @@ def main() -> int:
     ap.add_argument("--max-events", type=int, default=0, help="N건 전송 후 자동 종료 (시험용)")
     args = ap.parse_args()
     args.gui = False
+    from smartrecycle_edge.config import acquire_single_instance
+
+    lock = acquire_single_instance()
+    if lock is None:
+        print("카메라 프로그램이 이미 실행 중입니다 (Arduino 포트 충돌 방지). 기존 창을 사용하세요.")
+        return 4
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = EdgeApp(args)
     signal.signal(signal.SIGINT, lambda *_: app.stop.set())

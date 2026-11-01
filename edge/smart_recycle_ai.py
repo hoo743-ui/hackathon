@@ -457,6 +457,14 @@ def first_run_problems() -> list[str]:
 
 def main() -> None:
     setup_logging()
+    from smartrecycle_edge.config import acquire_single_instance
+
+    lock = acquire_single_instance()
+    if lock is None:
+        r = tk.Tk()
+        r.withdraw()
+        messagebox.showerror("SMART RECYCLE AI", "카메라 프로그램이 이미 실행 중입니다.\n작업 표시줄의 기존 창을 사용하세요.\n(두 개를 켜면 Arduino 포트를 서로 차지하려다 연결이 실패합니다)")
+        return
     root = tk.Tk()
     try:
         app = App(root)
