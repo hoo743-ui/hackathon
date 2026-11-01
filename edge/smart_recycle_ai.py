@@ -127,7 +127,7 @@ class App:
         btns.grid(row=2, column=0, sticky="ew")
         for i, (t, cmd) in enumerate([
             ("연결 재확인", self.recheck), ("카메라 재시작", self.restart_camera),
-            ("서버 재시도", self.retry_server), ("설정", self.open_settings), ("로그", self.open_logs),
+            ("서버 재시도", self.retry_server), ("설정", self.open_settings), ("캡처", self.capture), ("로그", self.open_logs),
             ("안전 종료", self.quit),
         ]):
             ttk.Button(btns, text=t, command=cmd).grid(row=0, column=i, padx=2, sticky="ew")
@@ -156,6 +156,31 @@ class App:
         else:
             self.phase = "failed"
             logging.getLogger("edge").error("시작 실패: %s", self.edge.status_msg)
+
+    def capture(self, tag: str = "") -> list[Path]:
+        """발표·보고용: 프로그램 창 전체 + 최신 인식 화면(바운딩 박스)을 captures/ 에 저장."""
+        import cv2
+        from PIL import ImageGrab
+
+        out = EDGE_DIR / "captures"
+        out.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S") + (f"_{tag}" if tag else "")
+        saved: list[Path] = []
+        self.root.update_idletasks()
+        x, y = self.root.winfo_rootx(), self.root.winfo_rooty()
+        w, h = self.root.winfo_width(), self.root.winfo_height()
+        try:
+            win = out / f"program_{stamp}.png"
+            ImageGrab.grab(bbox=(x, y, x + w, y + h), all_screens=True).save(win)
+            saved.append(win)
+        except Exception as exc:
+            logging.getLogger("edge").warning("창 캡처 실패 (macOS: 화면 기록 권한 필요): %s", exc)
+        if self.edge.latest_frame is not None:
+            frame = out / f"detection_{stamp}.jpg"
+            cv2.imwrite(str(frame), self.edge.latest_frame)
+            saved.append(frame)
+        logging.getLogger("edge").info("캡처 저장: %s", ", ".join(p.name for p in saved) or "없음")
+        return saved
 
     def estop(self) -> None:
         self.edge.emergency_stop()
