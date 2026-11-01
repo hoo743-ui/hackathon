@@ -72,7 +72,9 @@ class Heartbeat(threading.Thread):
         self.was_online = False
 
     def run(self) -> None:
-        while not self.stop_event.wait(settings.heartbeat_sec if self.was_online else 2.0):
+        first = True  # 시작 즉시 1회 보고 → 서버 로그에 접속 흔적이 바로 남는다
+        while first or not self.stop_event.wait(settings.heartbeat_sec if self.was_online else 2.0):
+            first = False
             a = self.app
             body = {
                 "device_id": settings.device_id,
@@ -294,6 +296,9 @@ class EdgeApp:
         """설정·모델·카메라 확인 후 백그라운드 스레드 시작. 실패 시 원인을 status_msg 에 남긴다."""
         for p in settings.problems():
             log.error("설정 오류: %s", p)
+        # 서버 연결·하드웨어는 모델/카메라와 무관하게 먼저 시작한다
+        # → 모델이 없거나 카메라가 안 열려도 서버에 상태(heartbeat)가 보고되고 GUI 에 연결 상태가 보인다
+        self.start_background()
         if settings.problems():
             self.status_msg = "설정 오류: " + "; ".join(settings.problems())
             return 2
@@ -329,20 +334,26 @@ class EdgeApp:
             log.error("카메라를 열 수 없습니다 (CAMERA_INDEX=%s). check_system.py --cameras 로 번호 확인", self.source)
             self.status_msg = f"카메라를 열 수 없음 (CAMERA_INDEX={self.source})"
             # 하드웨어·서버 상태는 계속 보고한다
-            self.uploader.start(); self.hw.start(); self.heartbeat.start(); self.housekeeper.start()
-            if self.esp32:
-                self.esp32.start()
             return 3
 
-        self.uploader.start()
-        self.hw.start()
-        if self.esp32:
-            self.esp32.start()
-        self.heartbeat.start()
-        self.housekeeper.start()
         log.info("시작: device=%s backend=%s", settings.device_id, settings.backend_url)
         self.status_msg = "카메라 모드"
         return 0
+
+    def start_background(self) -> None:
+        """전송 큐 · 하드웨어 시리얼 · ESP32 · heartbeat · 주기 작업 (한 번만)."""
+        if getattr(self, "_bg_started", False):
+            return
+        self._bg_started = True
+        if settings.backend_url:
+            self.uploader.start()
+            self.heartbeat.start()
+        else:
+            log.error("BACKEND_URL 이 비어 있어 서버 연결을 시작하지 않습니다")
+        self.hw.start()
+        if self.esp32:
+            self.esp32.start()
+        self.housekeeper.start()
 
     def loop(self) -> int:
         cap, still = self.cap, self.still
