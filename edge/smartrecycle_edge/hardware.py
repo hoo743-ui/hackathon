@@ -255,6 +255,9 @@ class HardwareController:
         self._busy_until = 0.0
         self._lock = threading.Lock()
         self._extra_line = on_line
+        self._port_setting = port_setting
+        self._exclude = exclude_ports or set()
+        self._last_scan = 0.0
         self.link: SerialLink | None = None
         if enabled:
             port, note = resolve_hw_port(port_setting, exclude_ports)
@@ -336,8 +339,24 @@ class HardwareController:
             if self.on_result:
                 self.on_result(p["detection_id"], sig, result)
 
+    def rescan(self) -> None:
+        """auto 모드에서 포트를 못 찾았으면 5초마다 다시 찾는다 (프로그램 시작 뒤에 UNO 를 꽂아도 자동 연결)."""
+        if not (self.enabled and self.link) or self.link.port or self._port_setting.lower() != "auto":
+            return
+        now = time.monotonic()
+        if now - self._last_scan < 5:
+            return
+        self._last_scan = now
+        port, note = resolve_hw_port(self._port_setting, self._exclude)
+        self.port_note = note
+        if port:
+            log.info("하드웨어 포트 발견: %s (%s) → 연결 시도", port, note)
+            self.link.port = port
+            self.link.retry()
+
     def tick(self) -> None:
-        """ACK 타임아웃 검사 + 펌웨어 판별 (메인 루프/하트비트에서 주기 호출)."""
+        """ACK 타임아웃 검사 + 펌웨어 판별 + 포트 재탐색 (주기 호출)."""
+        self.rescan()
         if self.connected and self.firmware == "unknown" and time.monotonic() - self._opened_at > self.hello_wait:
             self.firmware = "legacy"
             log.warning("UNO 펌웨어 응답(HELLO) 없음 → 구 펌웨어(trush.ino)로 간주: 동작 성공을 확인할 수 없음")

@@ -101,3 +101,25 @@ def test_sensor_median_fill_and_disconnect():
     s2 = SensorMonitor(empty_cm=0)
     s2.feed("10", now=0)
     assert s2.distance(0) == 10.0 and s2.fill_percent(0) is None  # 빈통 거리 없으면 적재율 없음
+
+
+def test_auto_port_found_after_start(monkeypatch):
+    """시작 때 장치가 없다가 나중에 꽂히면 자동으로 찾아 연결한다."""
+    from tests.fake_uno import FakeUno
+    import smartrecycle_edge.hardware as hwmod
+
+    found = {"port": None}
+    monkeypatch.setattr(hwmod, "resolve_hw_port", lambda setting, excl=None: (found["port"], "test"))
+    hw = HardwareController(True, "auto", 9600, busy_sec=1.0, on_line=lambda *_: None, hello_wait=0.5)
+    hw.link.reset_wait = 0
+    hw.start()
+    assert not hw.connected and hw.link.port is None
+    fake = FakeUno()
+    try:
+        found["port"] = fake.port  # 이제 꽂힘
+        hw._last_scan = 0
+        hw.tick()
+        assert wait(lambda: hw.connected, 5)
+        assert wait(lambda: hw.firmware == "uno_controller", 3)
+    finally:
+        hw.close(); fake.close()

@@ -73,7 +73,7 @@ def resolve_hw_port(configured: str, exclude: set[str] | None = None) -> tuple[s
     if not arduinos and len(clones) == 1 and not [p for p in ports if p.guess == "esp32"]:
         return clones[0].device, "자동 선택: CH340 1개 (클론 UNO로 추정 — 확인 필요)"
     if not ports:
-        return None, "연결된 USB 시리얼 장치 없음"
+        return None, "연결된 USB 시리얼 장치 없음 — UNO USB 케이블(데이터용)·장치 관리자 포트(COM) 확인, 꽂으면 5초 안에 자동 연결"
     return None, "후보가 여러 개이거나 Arduino를 특정할 수 없음 → HW_SERIAL_PORT 를 직접 지정하세요: " + ", ".join(
         f"{p.device}({p.guess})" for p in ports
     )
