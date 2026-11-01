@@ -75,7 +75,9 @@ export const HEALTH_LABELS: Record<HealthLevel, string> = {
 };
 
 export function deviceHealth(device: Device | undefined, bins: Bin[], commands: Command[]): DeviceHealth {
-  const own = device ? bins.filter((b) => b.device_id === device.device_id) : [];
+  // 측정값을 한 번도 보내지 않은 칸(sensor_status=null)은 '센서 미설치'로 보고 고장으로 세지 않는다
+  // (해커톤 구성: HC-SR04 1개 → 4칸 중 1칸만 센서)
+  const own = device ? bins.filter((b) => b.device_id === device.device_id && b.sensor_status !== null) : [];
   const sensorsOk = own.filter((b) => b.sensor_status === 'normal').length;
   const lastMotorResult =
     commands.find((c) => c.device_id === device?.device_id && c.command === 'OPEN_BIN' && c.status !== 'PENDING' && c.status !== 'SENT') ??

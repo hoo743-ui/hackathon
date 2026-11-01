@@ -47,6 +47,19 @@ export function OperationsPage() {
 
   const sendMode = (m: OperatingMode) => void tracker.send(`mode-${m}`, { command: 'SET_MODE', target: m });
 
+  if (dashboard?.hardware_mode === 'EDGE_SERIAL') {
+    return (
+      <div className="page page--control">
+        <PageHeader title="운영" meta={device ? <span className="t-mono">{device.device_id}</span> : null} />
+        <Notice tone="accent" testId="edge-mode">
+          이 시연 구성에서는 <strong>카메라 컴퓨터</strong>가 YOLO 결과로 Arduino 서보를 USB 시리얼로 직접 제어합니다. 서버·웹·앱의 원격
+          제어(모드 변경·수동 배출·모터 테스트)는 사용하지 않습니다. <strong>비상 정지</strong>는 카메라 컴퓨터 프로그램의 빨간 버튼을
+          사용하세요. 분류 결과와 하드웨어 동작 결과는 <a href="/sorting">분류 기록</a>, 장치 상태는 <a href="/devices">장치</a>에서 확인합니다.
+        </Notice>
+      </div>
+    );
+  }
+
   return (
     <div className="page page--control">
       <PageHeader title="운영" meta={device ? <span className="t-mono">{device.device_id}</span> : null} />

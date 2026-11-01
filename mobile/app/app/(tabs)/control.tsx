@@ -72,6 +72,25 @@ export default function ControlScreen() {
 
   const showProgress = !!(lastCommand || requesting);
 
+  if (dashboard?.hardware_mode === 'EDGE_SERIAL') {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.bg }}>
+        <TabHeader title="제어" />
+        <ScrollView contentContainerStyle={{ padding: space.s4, gap: space.s3 }}>
+          <View style={{ borderLeftWidth: 3, borderLeftColor: c.accent, paddingLeft: space.s3, gap: space.s2 }}>
+            <Text style={[t.bodyStrong, { color: c.ink }]}>카메라 컴퓨터가 직접 제어하는 구성입니다</Text>
+            <Text style={[t.body, { color: c.ink2 }]}>
+              YOLO 인식 결과에 따라 카메라 컴퓨터가 Arduino 서보 3개를 USB 시리얼로 구동합니다. 앱의 원격 제어(모드 변경·수동 배출·모터
+              테스트)는 사용하지 않습니다.
+            </Text>
+            <Text style={[t.body, { color: c.ink2 }]}>비상 정지는 카메라 컴퓨터 프로그램의 빨간 버튼을 사용하세요.</Text>
+            <Text style={[t.body, { color: c.ink2 }]}>인식 결과·하드웨어 동작 결과는 홈 탭, 칸별 적재율은 수거함 탭에서 확인합니다.</Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <TabHeader

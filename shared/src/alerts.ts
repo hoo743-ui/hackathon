@@ -69,7 +69,8 @@ export function deriveAlerts(d: Dashboard | null, now: number = Date.now()): Ale
       } else if (f !== null && f >= FILL_THRESHOLDS.warning) {
         out.push({ id: `warn-${b.bin_id}`, kind: 'bin_warning', severity: 'warning', title: `${name} ${f.toFixed(1)}% — 곧 비움 필요`, bin_id: b.bin_id, device_id: dev.device_id, at: b.last_valid_at });
       }
-      if (!b.calibrated) out.push({ id: `cal-${b.bin_id}`, kind: 'uncalibrated', severity: 'info', title: `${name} 보정 필요`, bin_id: b.bin_id, device_id: dev.device_id });
+      // 센서가 없는 칸은 보정 대상이 아님. 적재율이 이미 계산되는 칸(빈통 거리 설정됨)도 제외
+      if (!b.calibrated && b.sensor_status !== null && b.current_fill_percent === null) out.push({ id: `cal-${b.bin_id}`, kind: 'uncalibrated', severity: 'info', title: `${name} 보정 필요`, bin_id: b.bin_id, device_id: dev.device_id });
     }
   }
   for (const det of d.recent_detections ?? []) {

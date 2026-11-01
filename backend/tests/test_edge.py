@@ -218,3 +218,9 @@ async def test_distance_without_bin_is_only_logged(client):
     await dist(client, distance_cm=12.0, sensor_status="normal")
     bins = (await client.get("/api/bins")).json()
     assert all(b["current_distance_cm"] is None for b in bins)
+
+
+async def test_remote_commands_rejected_in_edge_mode(client, auth, publisher):
+    r = await client.post("/api/devices/DEVICE_001/commands", json={"command": "OPEN_BIN", "target": "plastic"}, headers=auth)
+    assert r.status_code == 409 and r.json()["error"]["code"] == "EDGE_SERIAL_MODE"
+    assert publisher.messages == []

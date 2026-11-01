@@ -10,5 +10,5 @@ PY="${PYTHON:-python3}"
   --collect-all ultralytics --collect-all torchvision --hidden-import start_camera_system smart_recycle_ai.py
 OUT=dist/SMART_RECYCLE_AI
 if [[ -f .env ]]; then cp .env "$OUT/.env"; else cp .env.example "$OUT/.env"; fi
-mkdir -p "$OUT/models"; [[ -f models/best_model.pt ]] && cp models/best_model.pt "$OUT/models/" || true
+cp settings.env "$OUT/settings.env"; mkdir -p "$OUT/models"; [[ -f models/best_model.pt ]] && cp models/best_model.pt "$OUT/models/" || true
 echo "완료: $OUT/SMART_RECYCLE_AI  (.env 와 models/best_model.pt 확인)"

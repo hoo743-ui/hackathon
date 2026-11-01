@@ -9,12 +9,20 @@ from pathlib import Path
 # EXE(PyInstaller)로 실행하면 실행 파일이 있는 폴더의 .env·models·logs 를 사용한다
 EDGE_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
 
+# 설정 우선순위: ① settings.env (팀 공통, Git 배포 — pull 하면 적용) ② .env (기기별·비밀값, Git 제외) ③ 코드 기본값
+# settings.env 에는 비밀값·기기별 값(토큰·COM·카메라·서버 주소)을 넣지 않는다.
 try:  # python-dotenv가 없으면 환경변수만 사용
-    from dotenv import load_dotenv
+    from dotenv import dotenv_values, load_dotenv
 
     load_dotenv(EDGE_DIR / ".env")
+    _team = EDGE_DIR / "settings.env"
+    if not _team.exists() and getattr(sys, "frozen", False):
+        _team = Path(getattr(sys, "_MEIPASS", EDGE_DIR)) / "settings.env"  # EXE 안에 포함된 기본값
+    TEAM_SETTINGS = {k: v for k, v in dotenv_values(_team).items() if v is not None} if _team.exists() else {}
+    for _k, _v in TEAM_SETTINGS.items():
+        os.environ[_k] = _v
 except ImportError:  # pragma: no cover
-    pass
+    TEAM_SETTINGS = {}
 
 
 def _bool(name: str, default: bool) -> bool:

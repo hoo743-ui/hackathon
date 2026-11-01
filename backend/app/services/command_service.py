@@ -20,7 +20,7 @@ from app.core.enums import (
 )
 from app.core.errors import APIError
 from app.core.time import utcnow
-from app.hardware.interfaces import HardwareAdapter
+from app.hardware.interfaces import HardwareMode, HardwareAdapter
 from app.models import Bin, DetectionLog, Device, DeviceCommand
 from app.schemas.api import CommandCreate
 from app.schemas.mqtt import AckPayload, CommandMessage
@@ -93,6 +93,12 @@ async def create_command(
     origin: CommandOrigin = CommandOrigin.MANUAL,
 ) -> tuple[DeviceCommand, bool]:
     """반환: (명령, 새로 생성 여부). 같은 command_id 재요청이면 기존 명령을 반환한다."""
+    if hardware.mode == HardwareMode.EDGE_SERIAL:
+        # 서보는 카메라 컴퓨터가 USB 시리얼로 직접 구동한다 → 서버에서 장치로 가는 경로가 없다
+        raise APIError(
+            409, "EDGE_SERIAL_MODE",
+            "카메라 컴퓨터가 하드웨어를 직접 제어하는 구성입니다. 원격 제어는 사용하지 않습니다 (비상 정지: 카메라 컴퓨터 프로그램).",
+        )
     if req.command_id is not None:
         existing = await session.scalar(select(DeviceCommand).where(DeviceCommand.command_id == req.command_id))
         if existing is not None:

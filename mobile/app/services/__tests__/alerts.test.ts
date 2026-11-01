@@ -64,7 +64,7 @@ describe('알림 탭 배지 = critical + warning', () => {
           bin({ bin_id: 'B1', current_fill_percent: 97 }),
           bin({ bin_id: 'B2', waste_type: 'metal', current_fill_percent: 85 }),
           bin({ bin_id: 'B3', waste_type: 'paper', sensor_status: 'timeout' }),
-          bin({ bin_id: 'B4', waste_type: 'glass', calibrated: false }),
+          bin({ bin_id: 'B4', waste_type: 'glass', calibrated: false, current_fill_percent: null }),
         ],
         recent_detections: [det({ outcome: 'SORT_FAILED', outcome_detail: 'ACK_TIMEOUT' })],
       }),

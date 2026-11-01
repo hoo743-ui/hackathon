@@ -18,6 +18,7 @@ pyinstaller --noconfirm --clean --windowed --name SMART_RECYCLE_AI ^
   smart_recycle_ai.py || goto :err
 echo [4/4] 설정·모델 복사
 if exist .env (copy /Y .env dist\SMART_RECYCLE_AI\.env >nul) else (copy /Y .env.example dist\SMART_RECYCLE_AI\.env >nul)
+copy /Y settings.env dist\SMART_RECYCLE_AI\settings.env >nul
 if not exist dist\SMART_RECYCLE_AI\models mkdir dist\SMART_RECYCLE_AI\models
 if exist models\best_model.pt copy /Y models\best_model.pt dist\SMART_RECYCLE_AI\models\ >nul
 echo.
